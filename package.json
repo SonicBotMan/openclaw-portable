@@ -1,7 +1,7 @@
 {
   "name": "openclaw-portable",
-  "version": "1.0.1",
-  "description": "即插即用的便携式 OpenClaw，支持预置 Node.js",
+  "version": "1.0.2",
+  "description": "即插即用的便携式 OpenClaw，支持预置 Node.js，自动检测 Windows 环境限制",
   "author": "小茹 <xiaoru@openclaw.ai>",
   "license": "MIT",
   "repository": {
@@ -14,6 +14,7 @@
   "openclaw": ">=2026.3.0",
   "scripts": {
     "setup": "bash scripts/setup-node.sh",
-    "start": "bash start.sh"
+    "start": "bash start.sh",
+    "diagnose": "scripts\\diagnose.bat"
   }
 }
