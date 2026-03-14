@@ -1,0 +1,14 @@
+{
+  "name": "openclaw-portable",
+  "version": "1.0.0",
+  "description": "即插即用的便携式 OpenClaw，  "author": "小茹 <xiaoru@openclaw.ai>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SonicBotMan/openclaw-portable.git"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "openclaw": ">=2026.3.0"
+}
