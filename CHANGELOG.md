@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2026-03-14
+
+### Added
+- ✨ Node.js 预置脚本
+  - Windows: `scripts/setup-node.bat`
+  - Linux/Mac: `scripts/setup-node.sh`
+  - 支持预置多个平台版本
+- 📝 更新 README 添加预置说明
+
+### Changed
+- 🚀 优化首次运行体验，避免下载等待
+
 ## [1.0.0] - 2026-03-14
 
 ### Added

@@ -49,11 +49,29 @@ chmod +x start.sh
 cp -r ~/.openclaw/* data/
 \`\`\`
 
+## 预置 Node.js（推荐）
+
+首次运行时需要下载约 60MB 的 Node.js。为避免等待，可以提前预置：
+
+### Windows
+```bash
+双击 scripts/setup-node.bat
+选择要预置的平台
+```
+
+### Linux/Mac
+```bash
+chmod +x scripts/setup-node.sh
+./scripts/setup-node.sh
+```
+
+预置后，启动时间将大幅缩短。
+
 ## 注意事项
 
 - U 盘建议使用 USB 3.0+ 或 SSD U 盘
 - 盘符会自动检测，无需手动配置
-- 首次运行需要下载 Node.js（约 60MB）
+- 预置 Node.js 可避免首次运行时的下载等待
 
 ## 许可证
 

@@ -1,7 +1,8 @@
 {
   "name": "openclaw-portable",
-  "version": "1.0.0",
-  "description": "即插即用的便携式 OpenClaw，  "author": "小茹 <xiaoru@openclaw.ai>",
+  "version": "1.0.1",
+  "description": "即插即用的便携式 OpenClaw，支持预置 Node.js",
+  "author": "小茹 <xiaoru@openclaw.ai>",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -10,5 +11,9 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "openclaw": ">=2026.3.0"
+  "openclaw": ">=2026.3.0",
+  "scripts": {
+    "setup": "bash scripts/setup-node.sh",
+    "start": "bash start.sh"
+  }
 }
