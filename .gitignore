@@ -1,0 +1,12 @@
+# Node.js 便携版（太大不上传）
+node-portable/
+
+# OpenClaw 核心（通过 submodule 管理）
+openclaw/
+
+# 用户数据（不上传）
+data/workspace/
+data/memory/
+
+# 保留配置示例
+!data/config/openclaw.json.example
