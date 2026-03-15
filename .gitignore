@@ -56,3 +56,5 @@ yarn-error.log*
 .vscode/
 .idea/
 *.iml
+.task-card.md
+.review.md

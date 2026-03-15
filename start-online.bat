@@ -107,7 +107,7 @@ echo.
 
 if not exist "%SCRIPT_DIR%\data" mkdir "%SCRIPT_DIR%\data"
 
-"%NODE_EXE%" "%OPENCLAW_ENTRY%" gateway run
+"%NODE_EXE%" "%OPENCLAW_ENTRY%" gateway run --port %GATEWAY_PORT%
 
 echo.
 if errorlevel 1 (

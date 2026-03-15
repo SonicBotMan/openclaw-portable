@@ -134,7 +134,7 @@ rem Auto-open browser after 8 seconds
 start "" cmd /c "timeout /t 8 /nobreak >nul && start http://localhost:%GATEWAY_PORT%"
 
 rem Start OpenClaw Gateway (foreground)
-"%NODE_EXE%" "%OPENCLAW_ENTRY%" gateway run --allow-unconfigured
+"%NODE_EXE%" "%OPENCLAW_ENTRY%" gateway run --port %GATEWAY_PORT% --allow-unconfigured
 
 rem === Exit handling ===
 echo.

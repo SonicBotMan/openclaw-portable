@@ -59,7 +59,7 @@ wsl -e bash -c "cd '%WSL_USB%' && chmod +x *.sh && ./start.sh '%WSL_USB%'"
 echo.
 echo ========================================
 echo   OpenClaw 已启动！
-echo   访问地址: http://localhost:3000
+echo   访问地址: http://localhost:18789
 echo ========================================
 echo.
 echo 使用完毕后，运行 stop.bat 一键关闭

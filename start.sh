@@ -227,21 +227,35 @@ export XDG_CONFIG_HOME="$TEMP_DIR/.config"
 export XDG_DATA_HOME="$TEMP_DIR/.local/share"
 # ❌ 删除这行: export HOME="$TEMP_DIR"
 
+# 验证启动（使用正确的端口）
+GATEWAY_PORT=${GATEWAY_PORT:-18789}
+
 # 检查是否已在运行
 STATUS=$(openclaw gateway status 2>/dev/null || true)
 if echo "$STATUS" | grep -q "running"; then
     echo -e "${YELLOW}⚠️  OpenClaw 已在运行，跳过启动${NC}"
 else
-    if ! openclaw gateway start; then
+    if ! openclaw gateway start --port $GATEWAY_PORT; then
         echo -e "${RED}❌ OpenClaw 启动失败！${NC}"
         exit 1
     fi
     sleep 2
 fi
 
-# 验证启动（使用正确的端口）
-GATEWAY_PORT=${GATEWAY_PORT:-18789}
-if curl -s "http://localhost:$GATEWAY_PORT/health" &>/dev/null; then
+# 验证启动
+HEALTH_CHECK_OK=0
+
+if command -v curl &>/dev/null; then
+    if curl -s "http://localhost:$GATEWAY_PORT/health" &>/dev/null; then
+        HEALTH_CHECK_OK=1
+    fi
+elif command -v wget &>/dev/null; then
+    if wget -q -O- "http://localhost:$GATEWAY_PORT/health" &>/dev/null; then
+        HEALTH_CHECK_OK=1
+    fi
+fi
+
+if [ $HEALTH_CHECK_OK -eq 1 ]; then
     echo ""
     echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║          ✅ 启动成功！                 ║${NC}"
