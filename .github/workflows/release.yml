@@ -1,140 +1,209 @@
-name: Build & Release v5.0 Offline Package
+name: Build & Release Portable Package
 
 on:
   push:
-    tags: ['v5.*']
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g., v5.0.0)'
-        required: true
-        default: 'v5.0.0'
-
-permissions:
-  contents: write
+        description: 'Version to build (e.g., 5.0.1)'
+        required: false
+        default: ''
 
 env:
   NODE_VERSION: "22.16.0"
-  OPENCLAW_VERSION: "latest"
 
 jobs:
-  build-offline-package:
-    name: Build Windows Offline Package
+  build-windows:
+    name: Build Windows Portable
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
-      - name: Download Node.js for Windows
+
+      - name: Setup build directory
         run: |
-          mkdir -p dist/OpenClaw-Portable-windows
-          NODE_URL="https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-win-x64.zip"
-          echo "Downloading Node.js ${NODE_VERSION}..."
+          mkdir -p dist-windows/node
+          mkdir -p dist-windows/openclaw-pkg
+          mkdir -p dist-windows/data
+          mkdir -p dist-windows/workspace
+          mkdir -p dist-windows/config
+
+      - name: Download Node.js Windows binary
+        run: |
+          NODE_URL="https://npmmirror.com/mirrors/node/v${NODE_VERSION}/node-v${NODE_VERSION}-win-x64.zip"
+          echo "Downloading Node.js from $NODE_URL"
           curl -fsSL "$NODE_URL" -o node-win.zip
           unzip -q node-win.zip
-          mv "node-v${NODE_VERSION}-win-x64" dist/OpenClaw-Portable-windows/node
-          rm node-win.zip
-          echo "✓ Node.js downloaded"
-      
-      - name: Install OpenClaw
-        run: |
-          mkdir -p dist/OpenClaw-Portable-windows/openclaw-pkg
-          echo "Installing OpenClaw..."
-          node dist/OpenClaw-Portable-windows/node/node_modules/npm/bin/npm-cli.js \
-            install -g openclaw \
-            --prefix dist/OpenClaw-Portable-windows/openclaw-pkg \
-            --registry https://registry.npmmirror.com
-          echo "✓ OpenClaw installed"
-      
-      - name: Copy scripts and configs
-        run: |
-          VERSION="${{ github.event.inputs.version || github.ref_name }}"
-          
-          # 复制脚本
-          cp start.bat stop.bat check.bat dist/OpenClaw-Portable-windows/
-          
-          # 复制配置
-          cp -r config dist/OpenClaw-Portable-windows/
-          
-          # 创建数据目录
-          mkdir -p dist/OpenClaw-Portable-windows/data
-          mkdir -p dist/OpenClaw-Portable-windows/workspace
-          mkdir -p dist/OpenClaw-Portable-windows/temp
-          
-          # 创建版本信息文件
-          echo "OpenClaw Portable v5.0.0" > dist/OpenClaw-Portable-windows/VERSION
-          echo "Node.js: ${NODE_VERSION}" >> dist/OpenClaw-Portable-windows/VERSION
-          echo "OpenClaw: ${OPENCLAW_VERSION}" >> dist/OpenClaw-Portable-windows/VERSION
-          echo "Build Date: $(date -u +%Y-%m-%d)" >> dist/OpenClaw-Portable-windows/VERSION
-          echo "Build Type: Offline Package" >> dist/OpenClaw-Portable-windows/VERSION
-          
-          echo "✓ Scripts and configs copied"
-      
-      - name: Create offline package
-        run: |
-          VERSION="${{ github.event.inputs.version || github.ref_name }}"
-          cd dist
-          zip -r "OpenClaw-Portable-${VERSION}-windows-offline.zip" OpenClaw-Portable-windows/
-          SIZE=$(du -h "OpenClaw-Portable-${VERSION}-windows-offline.zip" | cut -f1)
-          echo "PACKAGE_SIZE=${SIZE}" >> $GITHUB_ENV
-          echo "PACKAGE_NAME=OpenClaw-Portable-${VERSION}-windows-offline.zip" >> $GITHUB_ENV
-          echo "✓ Package created: ${SIZE}"
-      
-      - name: Generate checksum
-        run: |
-          cd dist
-          sha256sum OpenClaw-Portable-*-offline.zip > checksums.sha256
-          echo "✓ Checksum generated"
-      
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+          mv "node-v${NODE_VERSION}-win-x64/"* dist-windows/node/
+          rm -rf "node-v${NODE_VERSION}-win-x64" node-win.zip
+
+      - name: Setup Node.js (for npm)
+        uses: actions/setup-node@v4
         with:
-          files: |
-            dist/OpenClaw-Portable-*-offline.zip
-            dist/checksums.sha256
-          generate_release_notes: false
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install OpenClaw into portable prefix
+        run: |
+          npm install -g openclaw \
+            --prefix dist-windows/openclaw-pkg \
+            --registry https://registry.npmmirror.com
+
+      - name: Copy launcher scripts
+        run: |
+          cp start.bat dist-windows/ || true
+          cp stop.bat dist-windows/ || true
+          cp check.bat dist-windows/ || true
+          cp start-online.bat dist-windows/ || true
+          cp start-basic.bat dist-windows/ || true
+          cp restart.bat dist-windows/ || true
+          cp config.bat dist-windows/ || true
+          cp open-config.bat dist-windows/ || true
+
+      - name: Copy shell scripts
+        run: |
+          cp start.sh dist-windows/ || true
+          cp stop.sh dist-windows/ || true
+          cp start-basic.sh dist-windows/ || true
+
+      - name: Copy documentation
+        run: |
+          cp README.md dist-windows/ || true
+          cp README_CN.md dist-windows/ || true
+          cp LICENSE dist-windows/ || true
+          cp .gitattributes dist-windows/ || true
+          cp .editorconfig dist-windows/ || true
+
+      - name: Get version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Package Windows zip
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mv dist-windows "OpenClaw-Portable-${VERSION}"
+          zip -r "OpenClaw-Portable-${VERSION}-windows.zip" "OpenClaw-Portable-${VERSION}"
+          echo "ASSET_NAME=OpenClaw-Portable-${VERSION}-windows.zip" >> $GITHUB_ENV
+          ls -lh *.zip
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET_NAME }}
+          generate_release_notes: true
           body: |
-            ## 🚀 OpenClaw Portable v5.0 - 完全离线版本
-            
-            ### ✨ 新特性
-            
-            - **完全离线运行** - 无需任何网络连接
-            - **预置 Node.js 22.16.0** - 已包含在包中
-            - **预置 OpenClaw** - 已包含在包中
-            - **零配置启动** - 解压后双击 start.bat 即可
-            
-            ### 📦 包含内容
-            
-            | 组件 | 版本 | 大小 |
-            |------|------|------|
-            | Node.js | 22.16.0 | ~30MB |
-            | OpenClaw | Latest | ~30MB |
-            | 启动脚本 | v5.0 | <1MB |
-            
-            ### 📥 下载
-            
-            - **Windows**: `OpenClaw-Portable-v5.0.0-windows-offline.zip`
-            - **大小**: ${{ env.PACKAGE_SIZE }}
-            
-            ### ✅ 验证
-            
-            ```bash
-            sha256sum -c checksums.sha256
-            ```
-            
-            ### 🚀 使用方法
-            
-            1. 下载并解压到 U 盘
-            2. 双击 `start.bat`
+            ## OpenClaw Portable ${{ steps.version.outputs.version }}
+
+            ### 下载
+            - **Windows**: ${{ env.ASSET_NAME }}
+
+            ### 系统要求
+            - Windows 10 2004+ / Windows 11
+            - 至少 1GB 可用空间
+            - 首次运行需要网络（~60MB）
+
+            ### 快速开始
+            1. 解压到 U盘
+            2. 双击 `start-online.bat`（首次需联网）
             3. 访问 http://localhost:18789
-            
-            **无需联网！**
-      
+
+            ### 更新日志
+            查看 [Commits](https://github.com/${{ github.repository }}/commits/${{ github.sha }})
+
       - name: Upload artifact (for manual dispatch)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: offline-package
-          path: dist/OpenClaw-Portable-*-offline.zip
+          name: windows-portable
+          path: "*.zip"
+
+  build-linux:
+    name: Build Linux Portable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup build directory
+        run: |
+          mkdir -p dist-linux/node
+          mkdir -p dist-linux/openclaw-pkg
+          mkdir -p dist-linux/data
+          mkdir -p dist-linux/workspace
+          mkdir -p dist-linux/config
+
+      - name: Download Node.js Linux binary
+        run: |
+          NODE_URL="https://npmmirror.com/mirrors/node/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz"
+          echo "Downloading Node.js from $NODE_URL"
+          curl -fsSL "$NODE_URL" -o node-linux.tar.gz
+          tar -xzf node-linux.tar.gz
+          mv "node-v${NODE_VERSION}-linux-x64/"* dist-linux/node/
+          rm -rf "node-v${NODE_VERSION}-linux-x64" node-linux.tar.gz
+
+      - name: Setup Node.js (for npm)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install OpenClaw into portable prefix
+        run: |
+          npm install -g openclaw \
+            --prefix dist-linux/openclaw-pkg \
+            --registry https://registry.npmmirror.com
+
+      - name: Copy shell scripts
+        run: |
+          cp start.sh dist-linux/ || true
+          cp stop.sh dist-linux/ || true
+          cp start-basic.sh dist-linux/ || true
+          cp install.sh dist-linux/ || true
+          chmod +x dist-linux/*.sh
+
+      - name: Copy documentation
+        run: |
+          cp README.md dist-linux/ || true
+          cp README_CN.md dist-linux/ || true
+          cp LICENSE dist-linux/ || true
+          cp .gitattributes dist-linux/ || true
+          cp .editorconfig dist-linux/ || true
+
+      - name: Get version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Package Linux tarball
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mv dist-linux "OpenClaw-Portable-${VERSION}"
+          tar -czf "OpenClaw-Portable-${VERSION}-linux-x64.tar.gz" "OpenClaw-Portable-${VERSION}"
+          echo "ASSET_NAME=OpenClaw-Portable-${VERSION}-linux-x64.tar.gz" >> $GITHUB_ENV
+          ls -lh *.tar.gz
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET_NAME }}
+
+      - name: Upload artifact (for manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-portable
+          path: "*.tar.gz"
