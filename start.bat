@@ -1,10 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
-title OpenClaw Portable v5.0
+title OpenClaw Portable v5.0.1
 
 echo.
 echo ==========================================
-echo   OpenClaw Portable v5.0 - Offline Edition
+echo   OpenClaw Portable v5.0.1 - Offline Edition
 echo ==========================================
 echo.
 
@@ -14,8 +14,6 @@ if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 
 rem === Path configuration ===
 set "NODE_EXE=%SCRIPT_DIR%\node\node.exe"
-
-rem OpenClaw entry file
 set "OPENCLAW_ENTRY_LINUX=%SCRIPT_DIR%\openclaw-pkg\lib\node_modules\openclaw\openclaw.mjs"
 set "OPENCLAW_ENTRY_WINDOWS=%SCRIPT_DIR%\openclaw-pkg\node_modules\openclaw\openclaw.mjs"
 
@@ -47,6 +45,11 @@ if not exist "%NODE_EXE%" (
     echo.
     echo [ERROR] node\node.exe not found!
     echo.
+    echo This is an OFFLINE package. Node.js should be pre-bundled.
+    echo Please verify you downloaded the correct offline package.
+    echo.
+    echo If you want to use online bootstrap mode, use: start-online.bat
+    echo.
     pause
     exit /b 1
 )
@@ -64,6 +67,9 @@ if not exist "%OPENCLAW_ENTRY%" (
     echo.
     echo [ERROR] openclaw.mjs not found!
     echo.
+    echo This is an OFFLINE package. OpenClaw should be pre-bundled.
+    echo Please verify you downloaded the correct offline package.
+    echo.
     pause
     exit /b 1
 )
@@ -71,7 +77,7 @@ if not exist "%OPENCLAW_ENTRY%" (
 echo [OK]  OpenClaw is ready
 
 rem ============================================
-rem [3/5] Check port
+rem [3/5] Check port availability
 rem ============================================
 echo.
 echo [3/5] Checking port...
@@ -80,6 +86,13 @@ netstat -aon 2>nul | findstr ":%GATEWAY_PORT%" | findstr "LISTENING" >nul
 if not errorlevel 1 (
     echo [WARN] Port %GATEWAY_PORT% is in use, trying backup port 18790...
     set "GATEWAY_PORT=18790"
+    netstat -aon 2>nul | findstr ":18790" | findstr "LISTENING" >nul
+    if not errorlevel 1 (
+        echo [ERROR] Fallback port 18790 is also in use.
+        echo         Please edit GATEWAY_PORT in start.bat manually.
+        pause
+        exit /b 1
+    )
 )
 
 echo [OK]  Port %GATEWAY_PORT% is available

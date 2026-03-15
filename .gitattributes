@@ -1,21 +1,8 @@
-# Auto detect text files and perform LF normalization
-* text=auto
-
-# BAT files must use CRLF line endings on Windows
+# Force BAT files to use CRLF line endings (Windows standard)
 *.bat text eol=crlf
 
-# Shell scripts use LF
+# Ensure shell scripts use LF
 *.sh text eol=lf
 
-# Python files use LF
+# Python files
 *.py text eol=lf
-
-# YAML files use LF
-*.yml text eol=lf
-*.yaml text eol=lf
-
-# JSON files use LF
-*.json text eol=lf
-
-# Markdown files use LF
-*.md text eol=lf

@@ -1,6 +1,5 @@
 # EditorConfig - https://editorconfig.org
 
-# Top-most EditorConfig file
 root = true
 
 # Default settings
@@ -10,52 +9,30 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-# BAT files - MUST use CRLF and ASCII encoding
+# BAT files must use CRLF and ASCII/ANSI encoding (Windows standard)
 [*.bat]
 charset = latin1
 end_of_line = crlf
 
 # Shell scripts
 [*.sh]
-charset = utf-8
 end_of_line = lf
 
 # Python
 [*.py]
-charset = utf-8
-end_of_line = lf
 indent_style = space
 indent_size = 4
 
 # JavaScript/TypeScript
 [*.{js,ts,mjs,cjs}]
-charset = utf-8
-end_of_line = lf
 indent_style = space
 indent_size = 2
 
 # JSON
 [*.json]
-charset = utf-8
-end_of_line = lf
-indent_style = space
-indent_size = 2
-
-# YAML
-[*.{yml,yaml}]
-charset = utf-8
-end_of_line = lf
 indent_style = space
 indent_size = 2
 
 # Markdown
 [*.md]
-charset = utf-8
-end_of_line = lf
 trim_trailing_whitespace = false
-
-# Makefile
-[Makefile]
-charset = utf-8
-end_of_line = lf
-indent_style = tab
