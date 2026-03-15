@@ -1,6 +1,6 @@
 # 🚀 OpenClaw 便携版
 
-### 全球首创完全离线 AI 助手 - 无需网络，即插即用
+### 首次联网，后续离线 - 即插即用的 AI 助手
 
 **中文** | [English](README.md) | [日本語](README_JP.md)
 
@@ -10,20 +10,20 @@
 
 **传统 AI 助手的痛点：**
 - ❌ 安装耗时 10-30 分钟
-- ❌ 必须稳定网络连接
-- ❌ 国内需要翻墙或镜像
+- ❌ 每台电脑都需要安装
 - ❌ 换电脑需要重新安装
 - ❌ 数据分散在各个设备
 
-**结果？** 浪费时间、网络限制、隐私担忧。
+**结果？** 浪费时间、配置繁琐、隐私担忧。
 
 ---
 
 ## 💡 我们的方案：OpenClaw 便携版
 
-**全球首创：**
-- ✅ **完全离线运行** - 解压即用，无需网络
-- ✅ **60 秒极速安装** - 解压即用
+**核心优势：**
+- ✅ **首次联网自动安装** - 首次运行自动下载依赖（~60MB）
+- ✅ **后续完全离线** - 安装后无需网络即可运行
+- ✅ **60 秒极速启动** - 解压即用
 - ✅ **U盘即插即用** - AI 随身，数据随身
 - ✅ **零痕迹运行** - 完美适配公司/公共电脑
 - ✅ **自动同步** - 数据跟随你，而不是机器
@@ -37,8 +37,9 @@
 | 特性 | 传统安装 | 便携版 |
 |------|---------|-------|
 | **安装时间** | 10-30 分钟 | **60 秒** |
-| **需要网络** | ✅ 必须 | ❌ **不需要** |
-| **下载大小** | ~500MB | **0** |
+| **首次需要网络** | ✅ 是 | ✅ **是（~60MB）** |
+| **后续需要网络** | ✅ 是 | ❌ **不需要** |
+| **下载大小** | ~500MB | **~60MB（首次）** |
 | **换电脑** | ❌ 重装 | ✅ **即插即用** |
 | **数据同步** | ❌ 手动 | ✅ **自动** |
 | **隐私保护** | ❌ 有痕迹 | ✅ **零痕迹** |
@@ -79,17 +80,17 @@ openclaw config init
 **解决方案：**
 ```bash
 # 步骤 1：解压（1 分钟）
-unzip OpenClaw-Portable-v4.1.0.zip
+unzip OpenClaw-Portable-v5.0.1.zip
 
-# 步骤 2：运行（30 秒）
+# 步骤 2：首次运行（首次需联网，30 秒）
 ./start.sh
 
 # 完成！🎉
 ```
 
 **优势：**
-- ✅ 零下载（全部预装）
-- ✅ 离线可用（99% 的时间）
+- ✅ 首次自动下载依赖（~60MB）
+- ✅ 后续完全离线可用
 - ✅ U盘随身带（AI 走哪跟哪）
 - ✅ 数据自动同步
 - ✅ 退出零痕迹
@@ -100,15 +101,16 @@ unzip OpenClaw-Portable-v4.1.0.zip
 | 特性 | 传统安装 | 便携版 |
 |------|---------|-------|
 | **安装时间** | 10-30 分钟 | **60 秒** |
-| **需要网络** | ✅ 是（下载 500MB+） | ❌ **不需要** |
+| **首次需要网络** | ✅ 是（下载 500MB+） | ✅ **是（~60MB）** |
+| **后续需要网络** | ✅ 是 | ❌ **不需要** |
 | **需要翻墙（国内）** | ✅ 是 | ❌ **不需要** |
 | **换电脑** | ❌ 每次重装 | ✅ **USB 即用** |
 | **数据同步** | ❌ 手动 | ✅ **自动** |
 | **隐私保护（共享电脑）** | ❌ 有痕迹 | ✅ **零痕迹** |
 | **配置保存** | ❌ 每台机器单独配置 | ✅ **USB 随身带** |
-| **Node.js 安装** | ✅ 需要 | ❌ **预装** |
-| **OpenClaw 安装** | ✅ 需要 | ❌ **预装** |
-| **离线使用** | ❌ 不能 | ✅ **99% 离线** |
+| **Node.js 安装** | ✅ 需要 | ❌ **自动下载** |
+| **OpenClaw 安装** | ✅ 需要 | ❌ **自动下载** |
+| **离线使用** | ❌ 不能 | ✅ **后续完全离线** |
 
 **结论：** OpenClaw 便携版消除了传统安装的所有痛点，同时增加了便携性和隐私保护。
 
@@ -122,14 +124,15 @@ unzip OpenClaw-Portable-v4.1.0.zip
 |------|-----------|
 | **公司电脑** | 零痕迹，数据在 U盘 |
 | **网吧/公共电脑** | 即插即用，关闭即清 |
-| **无网络环境** | 几乎完全离线（仅 Git 需网络） |
 | **多设备切换** | 数据自动同步，无缝切换 |
 | **国内网络** | 无需翻墙，无需镜像 |
 
 ### ⚠️ 注意事项
 
-- **Git 安装** - 首次使用需要网络（系统通常已安装）
-- **大小** - 679MB（完整运行环境）
+- **首次运行** - 需要网络连接（自动下载 Node.js + OpenClaw，约 60MB）
+- **Git 功能** - 使用 Git 相关功能需要网络
+- **AI 对话** - 需要网络连接到 AI 服务（这是 AI 网关的本质）
+- **大小** - 完整安装后约 679MB
 - **更新** - 在有网络环境中运行 `npm install -g openclaw@latest`
 
 ---
@@ -141,13 +144,13 @@ unzip OpenClaw-Portable-v4.1.0.zip
 **1 分钟快速启动：**
 ```batch
 # 1. 解压到 U盘（1 分钟）
-解压 OpenClaw-Portable-v4.1.0.zip
+解压 OpenClaw-Portable-v5.0.1.zip
 
-# 2. 双击启动（首次 30 秒）
+# 2. 双击启动（首次需联网，30 秒）
 双击 start.bat
 
 # 3. 访问
-打开浏览器 → http://localhost:3000
+打开浏览器 → http://localhost:18789
 
 # 4. 关闭
 双击 stop.bat
@@ -159,14 +162,14 @@ unzip OpenClaw-Portable-v4.1.0.zip
 
 ```bash
 # 1. 解压
-tar -xzf OpenClaw-Portable-v4.1.0.tar.gz
+tar -xzf OpenClaw-Portable-v5.0.1.tar.gz
 
-# 2. 启动
-cd /media/$(whoami)/*/OpenClaw-Portable
+# 2. 启动（首次需联网）
+cd OpenClaw-Portable
 ./start.sh
 
 # 3. 访问
-打开浏览器 → http://localhost:3000
+打开浏览器 → http://localhost:18789
 
 # 4. 关闭
 ./stop.sh
@@ -176,10 +179,14 @@ cd /media/$(whoami)/*/OpenClaw-Portable
 
 ## 📦 包含内容
 
+首次运行后，目录结构如下：
+
 ```
 OpenClaw-Portable/
-├── node/              ← Node.js 22.14.0 (192MB)
-├── npm-global/        ← OpenClaw 2026.3.12 (487MB)
+├── node/              ← Node.js 22.x（首次自动下载，~30MB）
+├── openclaw-pkg/      ← OpenClaw + 依赖（首次自动下载，~30MB）
+├── data/              ← 用户数据（自动创建）
+├── workspace/         ← 工作空间（自动创建）
 ├── start.bat          ← Windows 智能启动
 ├── stop.bat           ← Windows 智能关闭
 ├── start.sh           ← Linux/macOS 智能启动
@@ -187,7 +194,8 @@ OpenClaw-Portable/
 └── config/            ← 配置目录
 ```
 
-**总大小：** 157MB（压缩包）→ 679MB（解压后）
+**下载包大小：** ~1MB（脚本）  
+**首次安装后：** ~679MB（完整运行环境）
 
 ---
 
@@ -199,13 +207,14 @@ OpenClaw-Portable/
 | **Linux** | Ubuntu 20.04+ / Debian 11+ |
 | **macOS** | macOS 10.15+ |
 | **U盘** | 至少 1GB 可用空间 |
+| **网络** | 首次运行需要（~60MB） |
 
 ---
 
 ## ⚠️ 安全提示
 
 **请勿分享以下文件：**
-- `config/openclaw.json` - 包含 API keys
+- `data/.openclaw/openclaw.json` - 包含 API keys
 - `data/.last_usb` - 包含路径信息
 
 **权限自动设置：**
@@ -221,7 +230,7 @@ OpenClaw-Portable/
 cd OpenClaw-Portable
 
 # 更新 OpenClaw
-export PATH="$PWD/node/bin:$PWD/npm-global/bin:$PATH"
+export PATH="$PWD/node/bin:$PWD/openclaw-pkg/bin:$PATH"
 npm install -g openclaw@latest
 ```
 
@@ -237,13 +246,27 @@ npm install -g openclaw@latest
 ## ❓ 常见问题
 
 <details>
-<summary><b>Q: 为什么这么大？</b></summary>
+<summary><b>Q: 为什么首次需要网络？</b></summary>
 
-包含完整运行环境：
-- Node.js 运行时（192MB）
-- OpenClaw + 依赖（487MB）
+便携版采用"轻量脚本 + 自动下载"模式：
+- 下载包只有脚本（~1MB）
+- 首次运行时自动下载 Node.js + OpenClaw（~60MB）
+- 下载后保存在 U盘，后续完全离线
 
-这是完全离线的代价。
+这样做的好处：
+- 下载包小，下载快
+- 始终是最新版本
+- 支持多平台（脚本自动适配）
+</details>
+
+<details>
+<summary><b>Q: 后续使用需要网络吗？</b></summary>
+
+**运行环境**：❌ 不需要（已下载）
+**AI 对话**：✅ 需要（连接 AI 服务）
+**Git 功能**：✅ 需要（克隆仓库等）
+
+简言之：运行环境离线，AI 服务需要网络。
 </details>
 
 <details>
@@ -255,7 +278,16 @@ npm install -g openclaw@latest
 <details>
 <summary><b>Q: 国内网络能用吗？</b></summary>
 
-完美适配！无需翻墙，无需镜像，开箱即用。
+完美适配！自动使用国内镜像，无需翻墙。
+</details>
+
+<details>
+<summary><b>Q: 如何在完全离线环境使用？</b></summary>
+
+需要提前准备：
+1. 在有网络环境首次运行，完成依赖下载
+2. 将整个目录复制到离线环境
+3. 后续即可完全离线运行（AI 对话除外）
 </details>
 
 <details>
@@ -263,7 +295,7 @@ npm install -g openclaw@latest
 
 在有网络环境中运行：
 ```bash
-export PATH="$PWD/node/bin:$PWD/npm-global/bin:$PATH"
+export PATH="$PWD/node/bin:$PWD/openclaw-pkg/bin:$PATH"
 npm install -g openclaw@latest
 ```
 </details>
@@ -272,7 +304,7 @@ npm install -g openclaw@latest
 
 ## 🤝 贡献
 
-欢迎贡献！查看 [CONtributing.md](CONTRIBUTING.md)
+欢迎贡献！查看 [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
@@ -290,7 +322,7 @@ MIT License - 查看 [LICENSE](LICENSE)
 
 ---
 
-**版本：** 4.1.0 | **发布日期：** 2026-03-14 | **Node.js：** v22.14.0 | **OpenClaw：** 2026.3.12
+**版本：** 5.0.1 | **发布日期：** 2026-03-15 | **Node.js：** v22.x | **OpenClaw：** Latest
 
 ---
 
