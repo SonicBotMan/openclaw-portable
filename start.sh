@@ -1,8 +1,12 @@
 #!/bin/bash
-# OpenClaw Portable - 智能启动脚本（自动检测 U盘）
-# 使用方法：./start-smart.sh
+# OpenClaw Portable - 智能启动脚本（修复版 v5.0.1）
+# 使用方法：./start.sh
 
-set -e
+# ✅ Fix 1: 立即定义 SCRIPT_DIR
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ✅ Fix 4: 去掉 set -e，改为手动错误处理
+# set -e  # 已删除
 
 # 颜色输出
 RED='\033[0;31m'
@@ -13,8 +17,8 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║    OpenClaw Portable - 智能启动        ║${NC}"
-echo -e "${GREEN}║        （自动检测 U盘）                ║${NC}"
+echo -e "${GREEN}║    OpenClaw Portable v5.0.1            ║${NC}"
+echo -e "${GREEN}║        Smart Launcher (Fixed)          ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -53,8 +57,8 @@ if [ -d "/Volumes" ]; then
     done
 fi
 
-# 检测当前目录（基于内容指纹，不依赖特定目录名）
-if [ -f "$SCRIPT_DIR/start.sh" ] && [ -d "$SCRIPT_DIR/node" ] && [ -d "$SCRIPT_DIR/npm-global" ]; then
+# ✅ Fix 1: 检测当前目录（SCRIPT_DIR 已正确定义）
+if [ -f "$SCRIPT_DIR/start.sh" ] && [ -d "$SCRIPT_DIR/node" ]; then
     CURRENT_USB=$(dirname "$SCRIPT_DIR")
     
     # 检查是否已经在列表中
@@ -137,12 +141,29 @@ else
     exit 1
 fi
 
-# 检测 Git
+# ✅ Fix 3: Git 检测（多平台 + 优雅失败）
 if ! command -v git &> /dev/null; then
-    echo -e "${YELLOW}⚠️  Git 未安装，正在安装...${NC}"
-    sudo apt-get update && sudo apt-get install -y git
+    echo -e "${YELLOW}⚠️  Git 未安装，尝试自动安装...${NC}"
+    
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get install -y git 2>/dev/null || true
+    elif command -v yum &> /dev/null; then
+        sudo yum install -y git 2>/dev/null || true
+    elif command -v brew &> /dev/null; then
+        brew install git 2>/dev/null || true
+    fi
+    
+    # 再检查一次，如果还没有就告诉用户手动装
+    if ! command -v git &> /dev/null; then
+        echo -e "${YELLOW}⚠️  Git 自动安装失败，部分功能可能受限${NC}"
+        echo -e "${YELLOW}    请手动安装 Git: https://git-scm.com/downloads${NC}"
+        echo -e "${YELLOW}    基本 AI 对话功能不受影响，继续启动...${NC}"
+    else
+        echo -e "${GREEN}✅ Git: $(git --version | cut -d' ' -f3)${NC}"
+    fi
+else
+    echo -e "${GREEN}✅ Git: $(git --version | cut -d' ' -f3)${NC}"
 fi
-echo -e "${GREEN}✅ Git: $(git --version | cut -d' ' -f3)${NC}"
 
 # ============================================
 # 4. 保存上次使用的路径
@@ -167,15 +188,21 @@ mkdir -p "$TEMP_DIR"
 
 # 从 U盘加载配置到本地
 if [ -d "$DATA_DIR/.openclaw" ]; then
-    cp -r "$DATA_DIR/.openclaw/"* "$TEMP_DIR/" 2>/dev/null || true
+    # 使用 rsync 进行增量同步（如果可用）
+    if command -v rsync &> /dev/null; then
+        rsync -av --update "$DATA_DIR/.openclaw/" "$TEMP_DIR/" 2>/dev/null || true
+    else
+        cp -r "$DATA_DIR/.openclaw/"* "$TEMP_DIR/" 2>/dev/null || true
+        echo -e "${YELLOW}⚠️  rsync 不可用，使用基础复制模式${NC}"
+    fi
     echo -e "${GREEN}✅ 配置已从 U盘加载${NC}"
 else
     mkdir -p "$TEMP_DIR"
     cat > "$TEMP_DIR/openclaw.json" << 'EOF'
 {
-  "port": 3000,
-  "models": {
-    "default": "zai/glm-5"
+  "gateway": {
+    "port": 18789,
+    "mode": "local"
   }
 }
 EOF
@@ -193,33 +220,43 @@ fi
 echo ""
 echo -e "${BLUE}[5/5] 启动 OpenClaw Gateway...${NC}"
 
+# ✅ Fix 2: 使用专属环境变量，不修改 HOME
 export OPENCLAW_WORKSPACE="$WORKSPACE_DIR"
 export OPENCLAW_CONFIG_DIR="$TEMP_DIR"
-export HOME="$TEMP_DIR"
+export XDG_CONFIG_HOME="$TEMP_DIR/.config"
+export XDG_DATA_HOME="$TEMP_DIR/.local/share"
+# ❌ 删除这行: export HOME="$TEMP_DIR"
 
 # 检查是否已在运行
 STATUS=$(openclaw gateway status 2>/dev/null || true)
 if echo "$STATUS" | grep -q "running"; then
     echo -e "${YELLOW}⚠️  OpenClaw 已在运行，跳过启动${NC}"
 else
-    openclaw gateway start
+    if ! openclaw gateway start; then
+        echo -e "${RED}❌ OpenClaw 启动失败！${NC}"
+        exit 1
+    fi
     sleep 2
 fi
 
-# 验证启动
-if curl -s http://localhost:3000/health &>/dev/null; then
+# 验证启动（使用正确的端口）
+GATEWAY_PORT=${GATEWAY_PORT:-18789}
+if curl -s "http://localhost:$GATEWAY_PORT/health" &>/dev/null; then
     echo ""
     echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║          ✅ 启动成功！                 ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "  ${BLUE}访问地址:${NC} http://localhost:3000"
+    echo -e "  ${BLUE}访问地址:${NC} http://localhost:$GATEWAY_PORT"
     echo -e "  ${BLUE}U盘路径:${NC}   $(dirname $USB_PATH)"
     echo ""
-    echo -e "  ${GREEN}完全离线，无需网络 📦${NC}"
+    echo -e "  ${GREEN}运行环境离线，AI 服务需要网络连接${NC}"
     echo ""
     echo -e "  ${YELLOW}使用完毕后运行 stop.sh 一键关闭${NC}"
 else
     echo -e "${RED}❌ 启动失败，请检查日志${NC}"
+    echo -e "${YELLOW}   常见原因：${NC}"
+    echo -e "${YELLOW}   1. 端口 $GATEWAY_PORT 被占用${NC}"
+    echo -e "${YELLOW}   2. 杀毒软件拦截${NC}"
     exit 1
 fi
