@@ -276,7 +276,8 @@ if [ $LLM_BUNDLED_READY -eq 1 ]; then
           name: 'Qwen2.5 1.5B (Bundled CPU)',
           contextWindow: 32768,
           maxTokens: 4096,
-          cost: { input: 0, output: 0 }
+          cost: { input: 0, output: 0 },
+          capabilities: { tools: false }
         }
       ]
     };
