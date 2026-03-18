@@ -39,6 +39,66 @@ echo [INFO] Data dir   : %OPENCLAW_HOME%
 echo.
 
 rem ============================================
+rem [0/6] 权限和端口检测（Issue #43）
+rem ============================================
+echo [0/6] Checking permissions and ports...
+echo.
+
+rem === 检测管理员权限（Windows） ===
+net session >nul 2>&1
+if errorlevel 1 (
+    echo [WARN] Not running as Administrator
+    echo        Some features may be limited
+    echo        Recommend: Right-click ^> Run as Administrator
+    echo.
+    set /p "Continue? (y/N): " CONTINUE
+    if /i not "!CONTINUE!"=="y" (
+        echo [ABORT] Cancelled by user
+        exit /b 0
+    )
+) else (
+    echo [OK] Running with Administrator privileges
+)
+echo.
+
+rem === 检测端口冲突 ===
+set PORT_CONFLICT=0
+
+echo Checking port %GATEWAY_PORT% (Gateway)...
+netstat -ano | findstr ":%GATEWAY_PORT%" | findstr "LISTENING" >nul 2>&1
+if errorlevel 0 (
+    echo [ERROR] Port %GATEWAY_PORT% is already in use
+    set PORT_CONFLICT=1
+) else (
+    echo [OK] Port %GATEWAY_PORT% is available
+)
+
+if exist "%LLM_BIN%" if exist "%LLM_MODEL%" (
+    echo Checking port %LLM_PORT% (LLM)...
+    netstat -ano | findstr ":%LLM_PORT%" | findstr "LISTENING" >nul 2>&1
+    if errorlevel 0 (
+        echo [ERROR] Port %LLM_PORT% is already in use
+        set PORT_CONFLICT=1
+    ) else (
+        echo [OK] Port %LLM_PORT% is available
+    )
+)
+
+if !PORT_CONFLICT!==0 (
+    echo.
+    echo [WARN] Port conflicts detected!
+    echo        1. Stop the processes using these ports
+    echo        2. Or change port numbers in configuration
+    echo.
+    set /p "Continue anyway? (y/N): " CONTINUE
+    if /i not "!CONTINUE!"=="y" (
+        echo [ABORT] Cancelled by user
+        exit /b 0
+    )
+)
+echo.
+
+rem ============================================
 rem [1/6] Check Node.js
 rem ============================================
 echo [1/6] Checking Node.js...

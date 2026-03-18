@@ -103,6 +103,64 @@ else
 fi
 
 # ============================================
+# 1.5/6 权限和端口检测（Issue #43）
+# ============================================
+echo ""
+echo -e "${BLUE}[检测] 权限和端口...${NC}"
+
+# 检测管理员权限（Windows）
+if [ "$OSTYPE" = "msys" ] || [ "$OSTYPE" = "cygwin" ] 2>/dev/null; then
+    if ! net session &>/dev/null 2>&1; then
+        echo -e "${YELLOW}[警告] 未以管理员身份运行${NC}"
+        echo -e "${YELLOW}  部分功能可能受限，建议右键以管理员身份运行${NC}"
+        echo ""
+        read -p "是否继续？(y/N): " CONTINUE
+        if [[ ! "$CONTINUE" =~ ^[Yy]$ ]]; then
+            echo -e "${RED}已取消启动${NC}"
+            exit 0
+        fi
+    else
+        echo -e "${GREEN}[OK] 已获取管理员权限${NC}"
+    fi
+fi
+
+# 检测端口冲突
+PORT_CONFLICT=0
+GATEWAY_PORT=${GATEWAY_PORT:-18789}
+LLM_PORT=${LLM_PORT:-18080}
+
+echo -e "${CYAN}  检测端口 $GATEWAY_PORT (Gateway)...${NC}"
+if lsof -i :$GATEWAY_PORT -sTCP:LISTEN -t &>/dev/null 2>&1 || netstat -an 2>/dev/null | grep -q ":$GATEWAY_PORT.*LISTEN"; then
+    echo -e "${RED}  [错误] 端口 $GATEWAY_PORT 已被占用${NC}"
+    PORT_CONFLICT=1
+else
+    echo -e "${GREEN}  [OK] 端口 $GATEWAY_PORT 可用${NC}"
+fi
+
+if [ "$LLM_BUNDLED_READY" = "1" ]; then
+    echo -e "${CYAN}  检测端口 $LLM_PORT (LLM)...${NC}"
+    if lsof -i :$LLM_PORT -sTCP:LISTEN -t &>/dev/null 2>&1 || netstat -an 2>/dev/null | grep -q ":$LLM_PORT.*LISTEN"; then
+        echo -e "${RED}  [错误] 端口 $LLM_PORT 已被占用${NC}"
+        PORT_CONFLICT=1
+    else
+        echo -e "${GREEN}  [OK] 端口 $LLM_PORT 可用${NC}"
+    fi
+fi
+
+if [ "$PORT_CONFLICT" -eq 1 ]; then
+    echo ""
+    echo -e "${YELLOW}[建议]${NC}"
+    echo "  1. 停止占用端口的进程"
+    echo "  2. 或修改配置文件中的端口号"
+    echo ""
+    read -p "是否继续启动？(y/N): " CONTINUE
+    if [[ ! "$CONTINUE" =~ ^[Yy]$ ]]; then
+        echo -e "${RED}已取消启动${NC}"
+        exit 0
+    fi
+fi
+
+# ============================================
 # 2/6 设置环境
 # ============================================
 echo ""
