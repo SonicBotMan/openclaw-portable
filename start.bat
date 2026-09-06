@@ -103,12 +103,11 @@ rem Assemble split GGUF parts (part1..partN) into data\ (package may be read-onl
 set "GGUF=%DATA_DIR%\%MODEL_FILE%.Q4_K_M.gguf"
 if exist "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part1" (
   echo [INFO] Assembling model from split parts...
-  copy /b "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part1" "%GGUF%" >nul 2>&1
+  set "PARTS=""%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part1"""
   for /l %%p in (2,1,32) do (
-    if exist "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part%%p" (
-      copy /b "%GGUF%" + "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part%%p" "%GGUF%" >nul 2>&1
-    )
+    if exist "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part%%p" set "PARTS=!PART! "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part%%p"""
   )
+  "%NODE%" "%SCRIPT_DIR%\scripts\assemble.js" "%GGUF%" !PARTS!
 )
 if not exist "%GGUF%" (
   if exist "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf" set "GGUF=%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf"
