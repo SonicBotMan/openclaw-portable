@@ -1,73 +1,42 @@
-# OpenClaw Portable - 快速使用指南
+# Quick Start
 
-**🚀 真正的一键便携式 OpenClaw**
+> 🇨🇳 中文说明见 [README_CN.md](README_CN.md)
 
----
+## Windows (2 minutes)
 
-## ⚡ 三步上手
+1. Download **both** release assets from the latest release:
+   - `OpenClaw-Portable-<ver>-windows-core.tar`
+   - `OpenClaw-Portable-<ver>-windows-model.tar`
+2. Extract the **core** tar to a folder, e.g. `D:\OpenClaw\`.
+3. Extract the **model** tar into the **same** folder — its `models/`
+   split parts merge into the core's `models/` directory.
+4. Double-click **`start.bat`**.
+   - First run imports the model locally (seconds, no download).
+   - The dashboard opens at `http://localhost:18789/?token=...`
+5. To stop: `stop.bat`. Before removing a USB drive: `cleanup.bat`.
 
+## Linux (1 minute)
+
+```bash
+tar xf OpenClaw-Portable-<ver>-linux-core.tar
+tar xf OpenClaw-Portable-<ver>-linux-model.tar
+./start.sh
+# dashboard: http://localhost:18789/?token=<shown in the terminal>
+./stop.sh
 ```
-1. 插入 U盘
-2. 双击 start.bat
-3. 访问 http://localhost:3000
-```
 
----
+## No internet needed
 
-## 🌏 国内用户特别优化
+With both packages present the whole flow works offline: no npm install, no
+model download, no telemetry. The only network access you may want is cloud
+API mode (`config.html`) — optional.
 
-### ✅ 自动加速
+## First agent message
 
-- **国内镜像**：自动检测并使用 npmmirror.com
-- **离线安装**：支持离线缓存，- **下载加速**：从分钟级降到秒级
+Open the dashboard URL (token in the address bar) and send a message like:
 
-### 📦 离线安装（可选）
+> Use the shell to run `echo hello from openclaw` and tell me the output.
 
-如果你网络较慢，可以：
-
-1. 在有网络的电脑上运行 `create-offline.sh`
-2. 将生成的 `offline-cache` 目录复制到 U盘
-3. 之后安装会优先使用离线缓存
-
----
-
-## 📊 安装速度对比
-
-| 场景 | 无优化 | 优化后 |
-|------|--------|-------|
-| 国内首次安装 | 10-30 分钟 | 1-3 分钟 |
-| 国内二次安装 | 5-10 分钟 | 10-30 秒 |
-| 使用离线包 | - | 30-60 秒 |
-
----
-
-## 🎯 完整功能列表
-
-| 功能 | 状态 |
-|------|------|
-| 一键启动 | ✅ |
-| 一键关闭 | ✅ |
-| 自动检测 U盘路径 | ✅ |
-| 自动安装依赖 | ✅ |
-| 国内镜像加速 | ✅ |
-| 离线安装支持 | ✅ |
-| 数据自动同步 | ✅ |
-| 隐私保护（无痕迹） | ✅ |
-| 跨平台支持 | ✅ |
-
----
-
-## 📦 文件说明
-
-| 文件 | 用途 |
-|------|------|
-| `start.bat` | Windows 一键启动 |
-| `stop.bat` | Windows 一键关闭 |
-| `check.bat` | 环境检测 |
-| `create-offline.sh` | 创建离线包 |
-| `OFFLINE-GUIDE.md` | 离线安装详细指南 |
-
----
-
-**版本：** 2.1.0
-**更新日期：** 2026-03-14
+The local model will call the tool and report the result. On CPU this takes
+a few minutes (see [BUNDLED_MODEL.md](BUNDLED_MODEL.md) for measured
+numbers).

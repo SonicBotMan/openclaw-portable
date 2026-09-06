@@ -1,140 +1,52 @@
-# OpenClaw Portable 离线安装指南
+# Offline Guide (v7)
 
-## 🌐 为什么需要离线包？
+Fully air-gapped usage of OpenClaw Portable.
 
-中国大陆用户访问以下资源可能很慢：
-- Node.js 官方源
-- npm 官方源
-- GitHub releases
+## What "offline" means here
 
-**解决方案：** 离线包 + 国内镜像
+- **Offline LLM mode** (needs core + model package): the agent runs on the
+  bundled qwen3:1.7b via Ollama. No network is contacted at all — the
+  gateway binds loopback, Ollama runs locally, model import is local.
+- **Offline install**: after extracting the packages there is no npm
+  install, no model download, no telemetry. (v6's "offline package" failed
+  this promise — see issue #58 and the CHANGELOG.)
 
----
+## Prepare (on a machine WITH internet)
 
-## 📦 创建离线包（在有网络的机器上）
+1. From GitHub releases download, per platform:
+   - `OpenClaw-Portable-<ver>-<platform>-core.tar`
+   - `OpenClaw-Portable-<ver>-<platform>-model.tar`
+2. Copy both onto the USB stick (FAT32 exFAT NTFS all fine — the parts are
+   each < 900 MB, under FAT32's 4 GB limit).
 
-### 方法1: 自动创建
+## First run (on the air-gapped machine)
 
-在有网络的机器上运行：
+1. Extract the **core** tar, then the **model** tar into the same folder.
+2. `start.bat` / `start.sh`.
+   - Model import happens automatically (seconds — it just registers the
+     local GGUF with Ollama's model store under `data/ollama-models`).
+3. Use the agent. Expect **minutes per agent turn on CPU**
+   (see BUNDLED_MODEL.md for measured numbers).
 
-```bash
-chmod +x create-offline.sh
-./create-offline.sh
-```
-
-会自动下载：
-- Node.js 20.x（国内镜像）
-- OpenClaw 二进制
-- npm 镜像配置
-
-### 方法2: 手动下载
-
-如果自动下载失败，手动下载以下文件：
-
-| 资源 | 下载地址 | 放置位置 |
-|------|---------|---------|
-| Node.js 20.11.0 (Linux x64) | [国内镜像](https://npmmirror.com/mirrors/node/v20.11.0/node-v20.11.0-linux-x64.tar.xz) | `offline-cache/node.tar.xz` |
-| OpenClaw 最新版 | [GitHub](https://github.com/openclaw/openclaw/releases) | `offline-cache/openclaw` |
-
----
-
-## 📂 离线包目录结构
-
-```
-openclaw-portable/
-├── offline-cache/              ← 离线缓存目录
-│   ├── node.tar.xz          ← Node.js 二进制
-│   ├── openclaw             ← OpenClaw 二进制
-│   └── .npmrc              ← npm 镜像配置
-├── start.bat
-├── start.sh
-└── ...
-```
-
----
-
-## 🚀 使用离线包
-
-1. 将 `offline-cache` 目录复制到 U盘
-
-2. 在目标机器上运行 `start.bat`
-
-3. 脚本会自动检测并使用离线缓存
-
----
-
-## ⚡ 加速策略
-
-### 已实现的功能
-
-| 功能 | 说明 |
-|------|------|
-| **国内镜像检测** | 自动检测是否在中国大陆 |
-| **npm 镜像** | 使用 npmmirror.com |
-| **Node.js 镜像** | 使用 npmmirror.com/mirrors/node |
-| **离线优先** | 优先使用离线缓存 |
-| **自动回退** | 离线失败时自动切换在线安装 |
-
-### 镜像源列表
-
-| 资源 | 官方源 | 国内镜像 |
-|------|--------|---------|
-| npm | registry.npmjs.org | registry.npmmirror.com |
-| Node.js | nodejs.org/dist | npmmirror.com/mirrors/node |
-| GitHub | github.com | ghproxy.com（可选） |
-
----
-
-## 🔧 高级配置
-
-### 使用代理
-
-如果用户有代理，可以设置：
+## Verify the offline chain works (optional)
 
 ```bash
-export HTTP_PROXY="http://127.0.0.1:7890"
-export HTTPS_PROXY="http://127.0.0.1:7890"
-./start.bat
+# inside the extracted package:
+./check.sh                      # or check.bat
+ollama show qwen3:1.7b | grep -A3 Capabilities   # must list "tools"
+curl http://127.0.0.1:18789/health                # {"ok":true,"status":"live"}
 ```
 
-### 使用自定义镜像
+## Gotchas
 
-编辑 `offline-cache/.npmrc`:
-
-```
-registry=https://your-mirror.com
-disturl=https://your-mirror.com/mirrors/node
-```
-
----
-
-## 📊 性能对比
-
-| 场景 | 传统安装 | 离线包 |
-|------|---------|--------|
-| **国内首次安装** | 10-30 分钟 | 1-2 分钟 |
-| **国内二次安装** | 5-10 分钟 | 10-30 秒 |
-| **无网络环境** | ❌ 失败 | ✅ 可用 |
-
----
-
-## ❓ 常见问题
-
-### Q: 离线包会过期吗？
-
-Node.js 和 OpenClaw 版本会更新，但基本功能不变。建议每 3-6 个月更新一次离线包。
-
-### Q: 离线包很大吗？
-
-- Node.js: ~25MB
-- OpenClaw: ~5MB
-- 总计: ~30MB
-
-### Q: 可以混用吗？
-
-可以。离线缓存失败时会自动切换在线安装。
-
----
-
-**版本：** 2.1.0
-**更新日期：** 2026-03-14
+- **Do not** point Ollama's config at an OpenAI-compatible base URL with
+  `/v1` for local tool calling — upstream documents that path as unreliable
+  for tools. The bundled config uses the native API; keep it that way.
+- **Do not** add `PARAMETER jinja true` to the Modelfile (invalid in Ollama
+  0.33.3 — "unknown parameter 'jinja'"). Jinja is a request-level option,
+  carried in `config/openclaw.json`.
+- Windows file names cannot contain `:` — model parts are named
+  `qwen3-1.7b...` (dash). The Ollama tag is `qwen3:1.7b` (colon) and that is
+  fine because tags are not file names.
+- If the model package is lost, re-downloading just the model package is
+  enough — the core package is unchanged.

@@ -1,201 +1,71 @@
-# 🤖 Built-in Local Model Support
+# Bundled model (v7)
 
-OpenClaw Portable v6.0.0+ comes with a **built-in CPU-only local AI model**, enabling truly offline AI assistance with zero API costs.
+## What is bundled
 
----
+| field | value |
+| --- | --- |
+| model | **qwen3:1.7b** (Qwen 3, 2.0B params) |
+| quant | Q4_K_M |
+| file | `qwen3-1.7b.Q4_K_M.gguf` (1,359,279,776 bytes = 1.26 GB) |
+| sha256 | `3d0b790534fe4b79525fc3692950408dca41171676ed7e21db57af5c65ef6ab6` |
+| provenance | byte-identical to `registry.ollama.ai/v2/library/qwen3/manifests/1.7b` model layer |
+| license | Apache-2.0 (`models/LICENSE.qwen3`) |
+| capabilities | completion, **tools**, thinking (measured via `ollama show`) |
+| context | 40 960 tokens (well above openclaw's 16 384 hard gate) |
 
-## 📦 What's Included
+Why qwen3:1.7b: it is the smallest model that passes openclaw's
+tool-calling gate (`supportsTools + contextWindow ≥ 16384`,
+`extensions/ollama/src/setup-model-selection.ts`) while staying in the
+"fits on a USB stick, loads in RAM on most laptops" class.
 
-### Model: Qwen2.5-1.5B-Instruct Q4_K_M
+## How it runs (v7)
 
-| Attribute | Value |
-|-----------|-------|
-| **Model Size** | ~900 MB |
-| **RAM Usage** | ~1.2 GB |
-| **Inference Engine** | llama.cpp `llama-server` (static binary, no install) |
-| **Tool Calling** | ✅ Native support |
-| **Context Window** | 32k tokens |
-| **CPU Speed (4-core)** | ~8-12 tok/s |
-| **License** | Apache 2.0 ✅ redistributable |
+1. `start.*` finds `models/qwen3-1.7b.Q4_K_M.gguf` (or split parts
+   `qwen3-1.7b.Q4_K_M.gguf.part1/2` — assembled into `data/` on first run).
+2. `scripts/import-model.js` runs `ollama create qwen3:1.7b -f
+   models/Modelfile.qwen3-1.7b` (FROM-only Modelfile → one-time, no download).
+3. openclaw talks to Ollama's **native** API (`api: "ollama"`, baseUrl
+   `http://127.0.0.1:11434` — **no** `/v1`; the OpenAI-compatible path has
+   unreliable tool calling) with `params: { jinja: true, num_ctx: 32768,
+   keep_alive: "30m" }`.
+   - `jinja: true` (request-level) activates the tool-aware Jinja template
+     embedded in the GGUF. Note: `PARAMETER jinja` in a Modelfile is **not
+     valid** in Ollama 0.33.3 — tool calling is enabled per request only.
+4. Agent turns then run fully offline: tool calls (shell, file ops) execute
+   on the local machine.
 
-This is the smallest model with **reliable tool-calling support**, which OpenClaw's agent runtime requires.
+## Honest performance expectations (CPU)
 
----
+Measured 2026-09-06, 16-core workstation, 46 GB RAM, Ollama 0.33.3:
 
-## 🚀 How It Works
+| workload | time |
+| --- | --- |
+| bare completion ("reply pong") | ~15 s (18.6 tok/s generation) |
+| prompt processing | ~100 tok/s |
+| **one full openclaw agent turn with 1 tool call** | **~19 min** |
 
-### Automatic Model Detection
+openclaw's agent prompt (system + tool schemas + skills) is ~29 K tokens, so
+every turn re-prefills a large context. Local mode is an **air-gap/emergency
+mode**: expect minutes per agent turn on CPU. For interactive speed use the
+cloud API mode (config.html).
 
-When you run `start.bat` or `start.sh`, OpenClaw Portable automatically:
+## Using a different local model
 
-1. **Detects** if llama-server binary and model file exist
-2. **Starts** llama-server on port 18080 (if available)
-3. **Registers** the model as `bundled-local/qwen2.5-1.5b`
-4. **Sets as default** if no primary model is configured
+1. Put its GGUF in `models/` (name it `my-model.gguf` — no `:` in file names
+   on Windows; the Ollama *tag* may keep colons).
+2. Write a Modelfile:
 
-### Graceful Degradation
+   ```
+   FROM /absolute/path/my-model.gguf
+   ```
 
-If the bundled model is not found:
-- ✅ OpenClaw still starts normally
-- ✅ Cloud API models remain available
-- ℹ️ User sees a warning message
+3. In `config/openclaw.json` change the provider model entry's `id` (e.g.
+   `my-model`), keep `params.jinja: true` **only if the GGUF embeds a
+   tool-aware Jinja template** (check with `ollama show my-model` →
+   Capabilities must include `tools`), and set
+   `agents.defaults.model.primary` to `ollama/my-model`.
+4. Requirements: `supportsTools=true` and ≥16 384 context, otherwise openclaw
+   will reject it for agent use.
 
----
-
-## 📁 Directory Structure
-
-```
-openclaw-portable/
-├── llm/
-│   ├── bin/
-│   │   ├── llama-server-linux-x86_64
-│   │   ├── llama-server-macos-arm64
-│   │   ├── llama-server-macos-x86_64
-│   │   └── llama-server-win32-avx2.exe
-│   ├── models/
-│   │   └── qwen2.5-1.5b-instruct-q4_k_m.gguf
-│   ├── server.log
-│   └── server.pid
-```
-
----
-
-## ⚙️ Configuration
-
-### Auto-Injected Model Provider
-
-The bundled model is automatically registered in `openclaw.json`:
-
-```json
-{
-  "models": {
-    "providers": {
-      "bundled-local": {
-        "baseUrl": "http://127.0.0.1:18080/v1",
-        "apiKey": "bundled-no-key",
-        "api": "openai-completions",
-        "models": [
-          {
-            "id": "qwen2.5-1.5b",
-            "name": "Qwen2.5 1.5B (Bundled CPU)",
-            "contextWindow": 32768,
-            "maxTokens": 4096,
-            "cost": { "input": 0, "output": 0 }
-          }
-        ]
-      }
-    }
-  }
-}
-```
-
-### Default vs Fallback
-
-- **No primary model configured**: Bundled model becomes default
-- **Primary model already configured**: Bundled model acts as fallback
-
----
-
-## 🎯 Performance Expectations
-
-### CPU Requirements
-
-| CPU | Speed | First Response |
-|-----|-------|----------------|
-| **4-core** | 8-12 tok/s | 5-10 seconds |
-| **8-core** | 12-18 tok/s | 5-8 seconds |
-| **16-core** | 15-22 tok/s | 3-5 seconds |
-
-### Memory Requirements
-
-- **Minimum**: 2 GB RAM
-- **Recommended**: 4 GB RAM
-- **Model Loading**: ~1.2 GB RAM
-
----
-
-## 🔧 Manual Control
-
-### Check if Model is Running
-
-**Windows:**
-```batch
-netstat -ano | findstr :18080
-```
-
-**Linux/macOS:**
-```bash
-lsof -i :18080
-```
-
-### Stop the Model
-
-Run `stop.bat` or `stop.sh`, which automatically stops llama-server.
-
-### Manual Start (if needed)
-
-**Windows:**
-```batch
-cd llm\bin
-llama-server-win32-avx2.exe --model ..\models\qwen2.5-1.5b-instruct-q4_k_m.gguf --port 18080 --host 127.0.0.1 --ctx-size 32768
-```
-
-**Linux/macOS:**
-```bash
-cd llm/bin
-./llama-server-linux-x86_64 --model ../models/qwen2.5-1.5b-instruct-q4_k_m.gguf --port 18080 --host 127.0.0.1 --ctx-size 32768
-```
-
----
-
-## ❓ FAQ
-
-### Q: Why is the model so slow?
-**A:** The bundled model runs on CPU only. For faster inference:
-- Use a machine with more cores
-- Close other CPU-intensive applications
-- Consider using a GPU-based model instead
-
-### Q: Can I use a different model?
-**A:** Yes! You can:
-1. Replace `llm/models/*.gguf` with your own GGUF model
-2. Update the model filename in `start.sh` / `start.bat`
-3. Restart OpenClaw
-
-### Q: What if my CPU doesn't support AVX2?
-**A:** The Windows binary requires AVX2 support. On older CPUs:
-- Use the Linux/macOS versions (more compatible)
-- Or use cloud API models instead
-
-### Q: Can I disable the bundled model?
-**A:** Yes, simply:
-1. Delete or rename the `llm/` directory
-2. OpenClaw will skip the bundled model startup
-
----
-
-## 🚀 Benefits
-
-| Feature | Cloud API | Bundled Model |
-|---------|-----------|---------------|
-| **Offline** | ❌ No | ✅ Yes |
-| **Zero Cost** | ❌ No | ✅ Yes |
-| **Privacy** | ⚠️ Data sent to cloud | ✅ All local |
-| **Speed** | ✅ Fast | ⚠️ Slower |
-| **Quality** | ✅ Best models | ⚠️ Smaller model |
-
----
-
-## 📥 Downloading the Model
-
-The model is included in the offline package. If you need to download it separately:
-
-```bash
-# Download Qwen2.5-1.5B-Instruct Q4_K_M (~900MB)
-curl -L -o llm/models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
-  https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf
-```
-
----
-
-**OpenClaw Portable - Your AI, Your Data, Everywhere, Even Offline!** 🚀
+Bigger/safer alternatives that pass the gate: `qwen3:4b`, `gemma4:e4b`
+(openclaw's own onboarding default), `qwen2.5:7b`.

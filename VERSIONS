@@ -1,0 +1,35 @@
+# OpenClaw Portable v7 — Pinned Version Manifest (single source of truth)
+#
+# Every release package MUST contain exactly these versions. CI asserts them;
+# start scripts verify `openclaw --version` matches OPENCLAW_VERSION.
+#
+# Why pinned (see CHANGELOG v7.0.0):
+#  - openclaw @latest broke v6.0.2: engine now requires Node >=22.22.3 (we
+#    bundled 22.16.0), local-model stack moved to Ollama native API
+#    (llama.cpp openai-completions path is unsupported/degraded upstream),
+#    and npm >=12 blocks lifecycle scripts unless --allow-scripts=openclaw.
+#  - 2026.8.2: last line before upstream issue #138488 (2026.9.1 Windows
+#    gateway-restart requires standalone OpenSSL under C:\Program Files —
+#    not possible for an unattended portable install). Re-pin to 2026.9.x
+#    once that issue is closed.
+
+VERSION=v7.0.0
+OPENCLAW_VERSION=2026.8.2
+NODE_VERSION=v26.8.1
+NODE_DIST=https://nodejs.org/dist/v26.8.1
+# npm 12 (shipped with Node 26) blocks lifecycle scripts by default:
+NPM_INSTALL_FLAGS=--allow-scripts=openclaw
+OLLAMA_VERSION=v0.33.3
+OLLAMA_DIST=https://github.com/ollama/ollama/releases/download/v0.33.3
+MODEL_NAME=qwen3:1.7b
+MODEL_FILE=qwen3-1.7b.Q4_K_M.gguf
+# Raw GGUF, official Qwen repo (Q4_K_M). Ollama 0.33 has no `ollama save`,
+# so we import from GGUF via committed Modelfile (models/Modelfile).
+MODEL_HF_URL=https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/qwen3-1.7b-q4_k_m.gguf
+GATEWAY_PORT=18789
+GATEWAY_FALLBACK_PORT=18790
+OLLAMA_PORT=11434
+OLLAMA_FALLBACK_PORT=11435
+# Upstream hard requirements: Node engine ">=22.22.3 <23 || >=24.15.0 <25 || >=25.9.0",
+# tool-calling models need supportsTools=true and contextWindow >= 16384.
+# qwen3:1.7b reports capabilities [completion, tools, thinking], ctx 32768.

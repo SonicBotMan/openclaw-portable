@@ -1,0 +1,42 @@
+{
+  "gateway": {
+    "mode": "local",
+    "port": 18789
+  },
+  "memory": {
+    "search": {
+      "enabled": false
+    }
+  },
+  "models": {
+    "providers": {
+      "ollama": {
+        "apiKey": "ollama-local",
+        "baseUrl": "http://127.0.0.1:11434",
+        "api": "ollama",
+        "timeoutSeconds": 900,
+        "models": [
+          {
+            "id": "qwen3:1.7b",
+            "name": "qwen3:1.7b (bundled GGUF, Q4_K_M)",
+            "input": ["text"],
+            "contextWindow": 40960,
+            "contextTokens": 30000,
+            "params": {
+              "jinja": true,
+              "num_ctx": 32768,
+              "keep_alive": "30m"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "ollama/qwen3:1.7b"
+      }
+    }
+  }
+}

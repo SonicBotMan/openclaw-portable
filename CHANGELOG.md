@@ -1,95 +1,82 @@
 # Changelog
 
-All notable changes to OpenClaw Portable will be documented in this file.
+## v7.0.0 (2026-09-06)
 
-## [6.0.2] - 2026-03-22
+### The offline package is actually offline now (issue #58, P0)
 
-### Fixed
-- **Issue #56** - 修复端口检测逻辑错误
-  - start.bat: 修复 `PORT_CONFLICT` 条件反转 (0→1)
-  - start.bat: 修复 `errorlevel` 检查逻辑错误 (≥0 → not errorlevel 1)
-  - start.sh: 修复 `LLM_BUNDLED_READY` 变量提前引用问题
-  - start.sh: 添加 LLM 服务启动后端口验证
+- v6.0.2's "offline" Windows package was 159 MB and contained **no model at
+  all** — the offline build step of the CI never downloaded or packed the
+  Qwen model, and nothing asserted package contents before release.
+- v7 splits the distribution into a **core package** (Node + openclaw +
+  Ollama + scripts, ~700 MB–1 GB) and a **model package** (qwen3:1.7b Q4_K_M
+  GGUF, ~1.26 GB, split into <900 MB parts), with CI **content-assertion
+  gates**: the release job cannot publish a core package missing
+  `node/openclaw.mjs/ollama`, or a model package whose parts don't total
+  ≥1 GB with the pinned GGUF sha256.
 
-## [6.0.1] - 2026-03-18
+### Pinned versions, no more `openclaw @latest` (issue #58 P0 root cause)
 
-### Fixed
-- **Issue #52** - 禁用本地模型的 `tools` 参数
-  - llama.cpp/Ollama 不支持 OpenAI function calling
-  - 添加 `capabilities: { tools: false }` 到 bundled-local 配置
-  - 避免 "500 Unsupported param: tools" 错误
+See `VERSIONS` — the single source of truth:
 
-### Added
-- **Issue #43** - 权限和端口检测 + 清理脚本
-  - 管理员权限检测（Windows）
-  - 端口冲突检测（Gateway + LLM）
-  - 敏感文件清理脚本（cleanup.sh / cleanup.bat）
-  - 轻度清理：日志、PID 文件
-  - 深度清理：配置、令牌、备份
+| component | v6.0.2 | v7.0.0 |
+| --- | --- | --- |
+| openclaw | `@latest` (unpinned) | **2026.8.2** (before upstream #138488) |
+| Node.js | 22.16.0 | **26.8.1** (22.16.0 no longer satisfies the openclaw engine: `>=22.22.3 <23`) |
+| LLM runtime | llama.cpp (built at package time, missing from the offline build) | **Ollama 0.33.3** (CPU-only, bundled) |
+| model | Qwen2.5-1.5B-Instruct GGUF | **qwen3:1.7b Q4_K_M** (sha256-pinned, verified byte-identical to the official registry model) |
 
-### Changed
-- 改善错误提示信息
-- 增强用户体验
+openclaw 2026.8.2 is chosen deliberately: upstream 2026.9.1 introduced a
+Windows regression (#138488) where a gateway **restart** requires a
+standalone OpenSSL under `C:\Program Files` — impossible for an unattended
+portable install. Re-pin once that issue is closed. The CI `smoke-windows`
+job regression-tests start → health → **restart** → health on
+`windows-latest`.
 
-## [6.0.0] - 2026-03-15
+### Local LLM stack: llama.cpp → Ollama native API (issue #52)
 
-### Added
-- **里程碑版本发布** - 基于 v5.0.5 完全重写
-- **新手友好文档** - 面向非技术用户重新设计
-- **完善的场景支持** - 嶙新的场景描述
-- **智能启动流程** - 60秒等待，进度反馈
-- **自动 Token 提取** - 自动显示并复制到剪贴板
-- **浏览器自动打开** - 带 token 自动访问
-- **跨平台支持** - Windows/Linux/macOS 完整支持
-- **离线包发布** - 148MB 完整离线包
-- **内置本地模型** - Qwen2.5-1.5B CPU-only
-- **企业级文档** - INSTALL.md, OFFLINE-GUIDE.md
-- **多语言支持** - 中/英/日 文档
+- Ollama 0.33 removed `ollama save`, so the package imports the raw GGUF via
+  a committed Modelfile (`models/Modelfile.qwen3-1.7b`, FROM-only) on first
+  start — one-time, no download.
+- `PARAMETER jinja` is **not** a valid Modelfile parameter; tool calling is
+  enabled per-request via `options.jinja=true`, which the openclaw config
+  template carries (`models.providers.ollama.models[0].params.jinja`).
+  Verified end-to-end: openclaw agent → Ollama native API → qwen3:1.7b
+  structured `tool_calls`.
+- Upstream hard gate respected: the bundled model reports
+  `capabilities: [completion, tools, thinking]` and 40 960 context tokens
+  (≥ the required 16 384).
 
-### Fixed
-- **端口传递问题** - 启动脚本正确传递端口号
-- **Token 提取** - 自动从配置文件提取
-- **浏览器启动** - 自动带 token 打开
+### Windows scripts rebuilt (issues #57, #56, #16)
 
-## [5.0.5] - 2026-03-15
+- `start.bat` is now **pure ASCII** (English output) — the v6 crash pattern
+  (UTF-8 batch + `chcp` + CJK `rem` inside `if()` blocks) is gone by
+  construction.
+- Port logic corrected: busy port → fallback (v6 compared the wrong way).
+- `restart.bat` no longer runs `taskkill /F /IM node.exe` (which killed
+  **every** node process on the machine).
+- `stop.bat` stops only processes belonging to this portable tree
+  (scripts/stop.js: command-line-scoped kill, PowerShell instead of wmic).
+- Gateway token is generated per boot (node crypto) and passed on the
+  command line; it is never written to disk.
 
-### Fixed
-- **启动超时** - 增加到 60 秒等待
-- **进度反馈** - 每 5 秒显示启动状态
-- **错误处理** - 更友好的错误提示
+### Linux
 
-## [5.0.4] - 2026-03-15
+- `start.sh` no longer **hard-requires a USB mount point** (issue #40): it
+  works from any folder.
+- `OPENCLAW_STATE_DIR`/`OLLAMA_MODELS` keep all state inside `data/`.
 
-### Fixed
-- **Windows 脚本语法** - 修复批处理脚本错误
-- **端口配置** - 正确传递端口号
+### Memory search off by default
 
-## [5.0.3] - 2026-03-15
+- openclaw's memory-core plugin defaults to OpenAI embeddings; fully offline
+  that errors. The template sets `memory.search.enabled=false`. Enable it
+  (and set an API key) only when you want memory features in cloud mode.
 
-### Added
-- **自动 Token 提取** - 启动后自动显示 token
-- **浏览器自动打开** - 带 token 自动访问
-- **剪贴板复制** - Token 自动复制
+### New / changed files
 
-### Fixed
-- **用户访问问题** - 解决端口无法访问的 bug
-
-## [5.0.2] - 2026-03-15
-
-### Fixed
-- **端口传递** - 启动脚本正确传递端口号
-- **环境变量** - 正确设置配置目录
-
-## [5.0.0] - 2026-03-14
-
-### Added
-- **首次发布** - 完全离线操作
-- **便携式设计** - USB 运行，零痕迹
-- **一键启动** - 双击 start.bat 即可
-
----
-
-For detailed release notes of older versions, see:
-- [v5.0.2 Details](https://github.com/SonicBotMan/openclaw-portable/releases/tag/v5.0.2)
-- [v5.0.3 Details](https://github.com/SonicBotMan/openclaw-portable/releases/tag/v5.0.3)
-- [v5.0.5 Details](https://github.com/SonicBotMan/openclaw-portable/releases/tag/v5.0.5)
+- `VERSIONS` — pinned version manifest
+- `config/openclaw.json` — committed template (no longer gitignored!)
+- `models/Modelfile.qwen3-1.7b`, `models/LICENSE.qwen3`, `models/REGISTRY_SOURCES.md`
+- `scripts/set-portable-config.js`, `scripts/import-model.js`, `scripts/stop.js`
+- `start/stop/check/cleanup/restart` rewritten; `start-online.bat`,
+  `start-basic.*`, `create-offline.sh`, `install.sh`, `bin/`,
+  `build-offline-package.sh`, llama docs removed.

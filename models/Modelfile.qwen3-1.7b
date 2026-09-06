@@ -1,0 +1,36 @@
+# OpenClaw Portable v7 — offline import of qwen3:1.7b (Q4_K_M GGUF)
+#
+# Verified 2026-09-06 on Ollama v0.33.3 (Linux amd64, CPU):
+#   fresh store -> `ollama create qwen3:1.7b -f Modelfile.qwen3-1.7b`
+#   -> `ollama show`: architecture qwen3, 2.0B, context 40960, quant Q4_K_M,
+#      capabilities [completion, tools, thinking]
+#   -> tool calling works when the CLIENT passes options.jinja=true
+#      (openclaw config: models.providers.ollama.models[0].params.jinja=true).
+#
+# IMPORTANT (learned the hard way):
+#   - `PARAMETER jinja true` is NOT a valid Modelfile parameter in 0.33.3
+#     ("Error: unknown parameter 'jinja'"). Jinja template selection happens
+#     per request (API `options.jinja`), which is what makes the GGUF's
+#     embedded tool-aware template active.
+#   - Without jinja, /api/chat with tools[] either errors "tools param
+#     requires --jinja flag" (registry model) or the model merely thinks
+#     about tools without emitting tool_calls (GGUF-created model).
+#   - Triple-quoted `"""` multi-line values are NOT parsed by 0.33.3's
+#     Modelfile parser — keep this file single-line values only.
+#
+# `jinja true` (request-level) makes Ollama use the Jinja chat template
+# embedded in the GGUF itself (tool-calling aware) — behaviorally equivalent
+# to `ollama pull qwen3:1.7b`, but requiring only the 1.26 GB raw GGUF
+# (Ollama 0.33 removed `ollama save`, so we cannot redistribute the pulled
+# model binary directly).
+#
+# GGUF provenance: huggingface.co/Qwen/Qwen3-1.7B-GGUF (Q4_K_M),
+# sha256 3d0b790534fe4b79525fc3692950408dca41171676ed7e21db57af5c65ef6ab6
+# — byte-identical to registry.ollama.ai/v2/library/qwen3/manifests/1.7b
+# model layer (see models/REGISTRY_SOURCES.md). License: Apache-2.0
+# (full text in models/LICENSE.qwen3).
+#
+# NOTE: scripts/import-model.js rewrites the FROM path to the absolute
+# location of the GGUF at runtime; the relative path below is canonical.
+
+FROM ./qwen3-1.7b.Q4_K_M.gguf
