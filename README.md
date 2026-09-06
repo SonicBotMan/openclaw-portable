@@ -1,307 +1,131 @@
-# 🚀 OpenClaw Portable
+# OpenClaw Portable (v7)
 
-### Run AI assistants from a USB drive, completely offline
+**OpenClaw (openclaw/openclaw) as a USB-stick portable app** — no install, no
+admin rights, fully offline LLM option. Bring it to any Windows or Linux
+machine, double-click, and your AI agent works — in the office, on a plane,
+or in a room with no network at all.
 
-[中文](README_CN.md) | **English** | [日本語](README_JP.md)
-
----
-
-## 📦 Two Versions Available
-
-Choose the version that fits your needs:
-
-| Version | Size | Model | Best For |
-|---------|------|-------|----------|
-| **Offline** | ~1.2 GB | ✅ Built-in Qwen2.5-1.5B | Complete offline use, no setup |
-| **Online** | ~300 MB | ❌ None (add your own) | Fast download, use cloud APIs |
-
-### Offline Version (Recommended)
-- ✅ **Complete offline operation** - No network needed after download
-- ✅ **Built-in Qwen2.5-1.5B model** - Zero API costs
-- ✅ **Works out of the box** - Just extract and run
-- 📥 **Download**: `OpenClaw-Portable-v6.0.0-windows-offline.tar.gz`
-
-### Online Version
-- ⚡ **Smaller download** - 4x faster to download
-- 🌐 **Use cloud APIs** - DeepSeek, OpenAI, etc.
-- 🤖 **Add your own model** - Support for custom models
-- 📥 **Download**: [OpenClaw-Portable-v6.0.0-windows-online.tar.gz](https://github.com/SonicBotMan/openclaw-portable/releases/tag/v6.0.0)
-
-**Recommendation**: Choose **Offline** version if you want complete offline operation. Choose **Online** version if you have stable internet or want to use specific cloud APIs.
+> 🇨🇳 中文用户请看 [README_CN.md](README_CN.md)
 
 ---
 
-## 🎉 What's New in v6.0
+## What's in the box
 
-### **Built-in Local Model Support** 🤖
+Two packages per platform (both required for offline use):
 
-OpenClaw Portable now includes a **CPU-only local AI model** (Qwen2.5-1.5B) that runs entirely offline:
+| package | contains | size (win) |
+| --- | --- | --- |
+| `...-core.tar` | Node.js 26, openclaw 2026.8.2, Ollama 0.33.3 (CPU), all scripts, config template | ~0.8–1.1 GB |
+| `...-model.tar` | qwen3:1.7b GGUF (Q4_K_M, sha256-pinned) + Modelfile, split into <900 MB parts | ~1.3 GB |
 
-- ✅ **Zero API costs** - No external API needed
-- ✅ **Complete offline** - Works without internet
-- ✅ **Zero configuration** - Auto-detected and registered
-- ✅ **Graceful degradation** - Cloud APIs still available as fallback
+All versions are pinned in [`VERSIONS`](VERSIONS). **v7's CI refuses to
+publish a package whose contents don't match those assertions** (this is the
+fix for [issue #58](../../issues/58): v6.0.2's "offline" package contained no
+model at all).
 
-See [BUNDLED_MODEL.md](BUNDLED_MODEL.md) for details.
+## Quick start (Windows)
 
----
+1. Extract **both** tar files so the model parts end up in `models\`:
 
-## 🎯 The Problem We Solve
+   ```
+   OpenClaw-Portable\
+   ├─ node\  openclaw-pkg\  ollama\          (from core)
+   ├─ models\
+   │  ├─ Modelfile.qwen3-1.7b                (from core)
+   │  ├─ part1                               (from model package)
+   │  └─ part2
+   └─ start.bat ...
+   ```
 
-**Traditional AI assistants require:**
-- ❌ 10-30 minutes installation with complex dependencies
-- ❌ Stable internet connection (VPN often needed)
-- ❌ Reinstallation when switching devices
-- ❌ Data scattered across multiple machines
-- ❌ Steep learning curve for new users
+   Then rename `models\part1` → `models\qwen3:1.7b.Q4_K_M.gguf.part1` and
+   `models\part2` → `models\qwen3:1.7b.Q4_K_M.gguf.part2`
+   (start.bat assembles them automatically on first run).
 
-**The result?** Frustration, wasted time, and privacy concerns.
+   *(Simpler: ask your release notes for the exact extraction layout — the
+   release ships a `README` section per package.)*
 
----
+2. Double-click **`start.bat`**.
+   - First run: imports the model into `data\ollama-models` (seconds, no
+     download).
+   - Gateway starts on **port 18789** (falls back to 18790 if busy).
+   - The dashboard opens in your browser with a per-boot token:
+     `http://localhost:18789/?token=...`
 
-## 💡 Our Solution: OpenClaw Portable v6.0
+3. Stop: **`stop.bat`** (stops only this portable's processes).
+   Before removing a USB drive: **`cleanup.bat`** (removes API keys,
+   sessions, logs — zero trace, [issue #43](../../issues/43)).
 
-**The first AI assistant that truly works out of the box:**
+## Quick start (Linux)
 
-### ✨ Core Features
-
-| Feature | Description |
-|---------|-------------|
-| **🔌 Completely Offline** | No network needed after first download |
-| **⚡ One-Click Start** | Double-click `start.bat`, wait 60s, done |
-| **💾 Portable Design** | Run from USB, your data travels with you |
-| **🔒 Zero Traces** | Perfect for shared/public computers |
-| **🔄 Auto Sync** | Data follows you, not the machine |
-| **🛡️ Enterprise Security** | Auto-configured permissions, template-based |
-| **🧠 Smart Startup** | Intelligent 60s wait with progress feedback |
-| **🌐 Auto Browser Launch** | Token auto-extracted, browser opens automatically |
-| **📝 Zero Configuration** | Extract and run, no setup required |
-
-**One USB. One click. Zero hassle.**
-
----
-
-## 🌟 Why OpenClaw Portable v6.0 is Unique
-
-| Feature | Traditional AI | OpenClaw Portable v6.0 |
-|---------|---------------|-------------------|
-| **Installation Time** | 10-30 min | **60 seconds** |
-| **Network Required** | Always | **Only first time** |
-| **VPN Needed** | Yes (in restricted regions) | **No** |
-| **Device Switching** | Reinstall required | **Just plug USB** |
-| **Privacy on Shared PCs** | Traces left behind | **Zero traces** |
-| **Data Sync** | Manual | **Automatic** |
-| **Configuration** | Complex setup | **Zero config** |
-| **Token Management** | Manual lookup | **Auto-extracted** |
-
----
-
-## 🎭 Perfect For These Scenarios
-
-### 🏢 Corporate Environment
-- **Problem:** Can't install software, monitored network
-- **Solution:** Run from USB, leave no traces
-- **Result:** Use AI assistant without IT approval
-
-### 🌐 Restricted Networks (China, Iran, etc.)
-- **Problem:** VPN unstable, slow downloads
-- **Solution:** Everything pre-installed, no downloads needed
-- **Result:** Perfect experience without VPN
-
-### ☕ Public Computers (Libraries, Cafes)
-- **Problem:** Can't install, data security concerns
-- **Solution:** Portable, auto-clean on exit
-- **Result:** Your AI, your privacy
-
-### 💼 Multiple Workstations
-- **Problem:** Reinstall on every machine
-- **Solution:** One USB for all machines
-- **Result:** Seamless workflow anywhere
-
-### 🏔️ Remote/Offline Locations
-- **Problem:** No internet, can't use AI
-- **Solution:** 99% offline operation after first setup
-- **Result:** AI assistant in the wilderness
-
----
-
-## 🚀 Quick Start (60 Seconds)
-
-### Windows
-```powershell
-1. Download offline package (148 MB)
-2. Extract to any folder
-3. Double-click start.bat
-4. Wait up to 60 seconds
-5. Browser opens automatically at http://localhost:18789
-6. Done! 🎉
-```
-
-### Linux/macOS
 ```bash
-# Extract
-tar -xzf OpenClaw-Portable-v6.0.0-*.tar.gz
-
-# Start
-cd OpenClaw-Portable-v6.0.0-windows
+tar xf OpenClaw-Portable-v7.0.0-linux-core.tar
+tar xf OpenClaw-Portable-v7.0.0-linux-model.tar   # parts land in models/
 ./start.sh
-
-# Browser opens automatically
+# dashboard: http://localhost:18789/?token=<shown in terminal>
 ```
 
-**That's it! No installation, no configuration, no network.**
+`start.sh` works from any folder or filesystem — no USB mount point required
+([issue #40](../../issues/40)).
 
----
+## Offline vs cloud mode
 
-## 📦 What's Inside
+- **Offline (local model)** — default when the model package is present.
+  Runs qwen3:1.7b through Ollama's native API with full tool calling
+  (agent can execute shell commands, read/write workspace files).
+  ⚠️ Honest expectations: on CPU, a full agent turn takes **minutes**
+  (measured: ~19 min for a one-tool task on a 16-core workstation with
+  46 GB RAM). Local mode is an emergency/air-gapped mode, not a fast one.
+- **Cloud (API key)** — core package only. Open `config.html` (or
+  `apply-config.bat` + `models.json`) to set e.g. an OpenAI/Anthropic key;
+  the agent then uses the cloud model (default `openai/gpt-5.6-sol`) and
+  local Ollama stays idle.
 
-### Windows Offline Package (148 MB)
+## Ports
+
+| service | default | fallback |
+| --- | --- | --- |
+| OpenClaw gateway / dashboard | **18789** | 18790 |
+| Ollama | **11434** | 11435 |
+
+## Files
+
 ```
-OpenClaw-Portable-v6.0.0-windows/
-├── node/              ← Node.js 22.16.0 (Pre-installed)
-├── openclaw-pkg/      ← OpenClaw latest (Pre-installed)
-├── start.bat          ← One-click start
-├── stop.bat           ← One-click stop & clean
-├── check.bat          ← Environment check
-├── config/            ← Configuration templates
-│   └── openclaw.json.example
-└── workspace/         ← Your workspace (auto-created)
-```
-
-### Features Included
-- ✅ **Node.js 22.16.0** - Complete runtime pre-installed
-- ✅ **OpenClaw latest** - All dependencies included
-- ✅ **Smart startup scripts** - Auto-detect, auto-wait, auto-launch
-- ✅ **Configuration templates** - Easy customization
-- ✅ **Zero network dependency** - Works completely offline
-
----
-
-## 🔧 Advanced Usage
-
-### Custom Port
-Edit `start.bat` and change:
-```batch
-set GATEWAY_PORT=18789
-```
-
-### Custom Configuration
-1. Copy `config/openclaw.json.example` to `config/openclaw.json`
-2. Edit the configuration
-3. Restart OpenClaw
-
-### Environment Variables (Linux/macOS)
-```bash
-export GATEWAY_PORT=18790
-./start.sh
+start.bat / start.sh      one-click start (checks, imports model, gateway, opens UI)
+stop.bat  / stop.sh       stop this portable's gateway + Ollama only
+check.bat / check.sh      environment check (node, openclaw, ollama, model, ports)
+cleanup.bat / cleanup.sh  zero-trace cleanup before unmounting
+restart.bat               restart gateway (Windows; Linux: ./stop.sh && ./start.sh)
+config.html + apply-config.bat   cloud API key setup panel
+scripts/                  set-portable-config.js, import-model.js, stop.js
+VERSIONS                  pinned versions (source of truth for CI)
+data/                     runtime state (config, sessions, model store, logs)
 ```
 
----
+## Security notes
 
-## ❓ FAQ
+- The gateway token is generated **per boot** with `crypto.randomBytes(24)`
+  and only appears in the URL the launcher opens — never written to disk.
+- The gateway binds **loopback only** (`--bind loopback`).
+- Nothing is installed outside this folder (Node, openclaw, Ollama all live
+  inside; all runtime state in `data/`).
 
-### Q: Why is the download so large (148 MB)?
-**A:** It includes the complete runtime:
-- Node.js runtime (~85 MB)
-- OpenClaw + all dependencies (~63 MB)
-- This is the price of true offline capability
+## Upstream compatibility (read this before re-pinning)
 
-### Q: Can I use it on corporate computers?
-**A:** Yes! All data stays on USB, zero traces on local machine.
+- openclaw is pinned to **2026.8.2** because of
+  [upstream #138488](https://github.com/openclaw/openclaw/issues/138488)
+  (2026.9.1: Windows gateway *restart* requires a standalone OpenSSL under
+  `C:\Program Files` — impossible for unattended portable installs). The CI
+  `smoke-windows` job regression-tests gateway start→restart→health.
+- Node is pinned to **26.8.1**: openclaw's engine requires
+  `>=22.22.3 <23 || >=24.15.0 <25 || >=25.9.0` (the v6.0.2 package shipped
+  22.16.0 and could not start openclaw at all).
+- npm ≥12 blocks lifecycle scripts by default; the CI installs openclaw with
+  `--allow-scripts=openclaw` and runs an `openclaw --version` smoke gate,
+  because openclaw's entry refuses to start when its install lifecycle did
+  not run.
 
-### Q: Does it work in China?
-**A:** Perfectly! No VPN needed, everything pre-downloaded.
+## License
 
-### Q: What if startup takes more than 60 seconds?
-**A:** First-time startup may take longer. The script will continue waiting and show progress every 5 seconds.
-
-### Q: Where can I find my token?
-**A:** Token is automatically extracted and displayed in the console. Browser opens with token in URL.
-
----
-
-## 📊 Version History
-
-| Version | Date | Type | Highlights |
-|---------|------|------|------------|
-| **v6.0.0** | 2026-03-15 | 🎉 Milestone | Complete rewrite, zero-config, perfect for non-technical users |
-| v5.0.5 | 2026-03-15 | 🐛 Bug Fix | Improved startup timeout (60s), better token extraction |
-| v5.0.4 | 2026-03-15 | 🐛 Bug Fix | Fixed Windows batch script syntax errors |
-| v5.0.3 | 2026-03-15 | ✨ Feature | Auto-extract and display token, browser auto-launch |
-| v5.0.2 | 2026-03-15 | 🐛 Bug Fix | Fixed port passing in startup scripts |
-| v5.0.0 | 2026-03-14 | 🎉 Initial | First release, completely offline operation |
-
----
-
-## 📥 Download
-
-### Latest Release: v6.0.0
-
-**Windows Offline Package:**
-- **Size:** 148.61 MB
-- **Download:** https://github.com/SonicBotMan/openclaw-portable/releases/tag/v6.0.0
-
-**Linux/macOS:**
-- Clone the repository
-- Run `./install.sh` (first time only, requires network)
-- Run `./start.sh` (subsequent runs are completely offline)
-
----
-
-## 📖 Documentation
-
-| Document | Description |
-|----------|-------------|
-| [README_CN.md](README_CN.md) | 中文文档 |
-| [README_JP.md](README_JP.md) | 日本語ドキュメント |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
-| [INSTALL.md](INSTALL.md) | Installation guide |
-| [QUICK-START.md](QUICK-START.md) | Quick start guide |
-| [OFFLINE-GUIDE.md](OFFLINE-GUIDE.md) | Offline usage guide |
-
----
-
-## 🤝 Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md)
-
----
-
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE)
-
----
-
-## 🌟 Star History
-
-If this project helps you, please ⭐️ star it!
-
-[![GitHub stars](https://img.shields.io/github/stars/SonicBotMan/openclaw-portable?style=for-the-badge&logo=github&color=yellow)](https://github.com/SonicBotMan/openclaw-portable/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/SonicBotMan/openclaw-portable?style=for-the-badge&logo=github&color=blue)](https://github.com/SonicBotMan/openclaw-portable/network/members)
-
-<details>
-<summary>📊 View Star History Chart</summary>
-
-[![Star History Chart](https://api.star-history.com/svg?repos=SonicBotMan/openclaw-portable&type=Date)](https://star-history.com/#SonicBotMan/openclaw-portable&Date)
-
-<i>Note: The chart above may take 24-48 hours to update due to GitHub's image cache. Click to view real-time data on Star History website.</i>
-
-</details>
-
----
-
-**Version:** 6.0.0 | **Release Date:** 2026-03-15 | **Node.js:** v22.16.0 | **OpenClaw:** latest
-
----
-
-<p align="center">
-  <b>Made with ❤️ for the global AI community</b>
-</p>
-
-<p align="center">
-  <a href="https://github.com/SonicBotMan/openclaw-portable">GitHub</a> •
-  <a href="https://github.com/SonicBotMan/openclaw-portable/releases">Download</a> •
-  <a href="https://github.com/SonicBotMan/openclaw-portable/issues">Report Bug</a> •
-  <a href="https://github.com/SonicBotMan/openclaw-portable/issues">Request Feature</a>
-</p>
+This repo's code is MIT (see LICENSE). OpenClaw is © its upstream project
+(see its own license). The bundled model qwen3:1.7b is Apache-2.0
+(`models/LICENSE.qwen3`).

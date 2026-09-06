@@ -1,211 +1,445 @@
-name: Build Dual Release Packages
+# =============================================================================
+# OpenClaw Portable v7 — dual-package build + release
+#
+# Produces two packages per platform (see VERSIONS):
+#   OpenClaw-Portable-<ver>-<platform>-core.tar   (node + openclaw + ollama + scripts)
+#   OpenClaw-Portable-<ver>-<platform>-model.tar  (qwen3-1.7b GGUF parts + Modelfile)
+#
+# v7 CI gates (fix for issue #58, which shipped a 159 MB "offline" package
+# that contained no model at all):
+#   GATE 1  install smoke   — `openclaw --version` after npm install (catches
+#                             the openclaw.mjs lifecycle guard / npm-12 script
+#                             blocking before anything is shipped)
+#   GATE 2  core contents   — every required file present, size >= 500 MB
+#   GATE 3  model hash      — GGUF sha256 equals the pinned digest
+#   GATE 4  model contents  — parts total >= 1 GB + Modelfile present
+#   GATE 5  reassembly      — parts rejoin byte-identical (sha256)
+#   GATE 6  restart smoke   — gateway start -> /health -> stop -> start again
+#                             (regression guard for upstream #138488: the
+#                             2026.9.1 Windows OpenSSL-restart break)
+#
+# Filename note: Windows NTFS forbids ':' in file names, so model parts use
+# "qwen3-1.7b.Q4_K_M.gguf.partN"; the Ollama model TAG stays "qwen3:1.7b".
+#
+# Usage: Actions -> build-dual-release -> Run workflow (VERSION input).
+# Creates/updates a GitHub release with all four tars.
+# =============================================================================
+
+name: build-dual-release
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
-
-permissions:
-  contents: write
-  packages: write
+    inputs:
+      VERSION:
+        description: "Release version, e.g. v7.0.0"
+        required: false
+        default: "v7.0.0"
 
 jobs:
-  build-offline:
+  # ---------------------------------------------------------------------------
+  build-windows:
     runs-on: windows-latest
     timeout-minutes: 90
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Create directory structure
-        shell: bash
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
+      - name: Read pinned versions
+        id: ver
+        shell: pwsh
         run: |
-          mkdir -p dist/OpenClaw-Portable-${{ env.VERSION }}-windows-offline/node
+          $v = @{}
+          Get-Content "VERSIONS" | ForEach-Object {
+            if ($_ -match '^([A-Z_]+)=(.+)$') { $v[$matches[1]] = $matches[2] }
+          }
+          $v['VERSION'] = "${{ inputs.VERSION }}"
+          "NODE_VERSION=$($v.NODE_VERSION)"     | Add-Content -Path $env:GITHUB_OUTPUT
+          "OPENCLAW_VERSION=$($v.OPENCLAW_VERSION)" | Add-Content -Path $env:GITHUB_OUTPUT
+          "OLLAMA_VERSION=$($v.OLLAMA_VERSION)" | Add-Content -Path $env:GITHUB_OUTPUT
+          "RELEASE=$($v.VERSION)"               | Add-Content -Path $env:GITHUB_OUTPUT
 
-      - name: Download Node.js
-        shell: bash
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
+      - name: Fetch Node.js (pinned)
+        shell: pwsh
         run: |
-          curl -fsSL \
-            "https://nodejs.org/dist/v22.16.0/node-v22.16.0-win-x64.zip" \
-            -o /tmp/node.zip
+          $v = "${{ steps.ver.outputs.NODE_VERSION }}"   # e.g. v26.8.1
+          $dist = "https://nodejs.org/dist/$v"
+          $zip = "node-$v-win-x64.zip"
+          Invoke-WebRequest "$dist/$zip" -OutFile "$env:RUNNER_TEMP/$zip"
+          Expand-Archive "$env:RUNNER_TEMP/$zip" -DestinationPath "$env:RUNNER_TEMP"
+          $root = Get-ChildItem "$env:RUNNER_TEMP" -Directory -Filter "node-*" | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path "dist/core/node" | Out-Null
+          Copy-Item -Recurse "$($root.FullName)/*" "dist/core/node/"
+          & "dist/core/node/node.exe" --version
 
-          unzip -q /tmp/node.zip -d /tmp/
-          mv /tmp/node-v22.16.0-win-x64/* dist/OpenClaw-Portable-${{ env.VERSION }}-windows-offline/node/
-          rm -rf /tmp/node.zip /tmp/node-v22.16.0-win-x64
-
-      - name: Install OpenClaw
-        shell: bash
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
+      - name: Install openclaw (pinned, lifecycle scripts allowed)
+        shell: pwsh
         run: |
-          cd dist/OpenClaw-Portable-${{ env.VERSION }}-windows-offline
+          # Node 26 ships npm 12, which blocks package lifecycle scripts by
+          # default. openclaw's entry (openclaw.mjs) hard-fails without its
+          # install lifecycle, so --allow-scripts=openclaw is mandatory.
+          & "dist/core/node/node.exe" "dist/core/node/node_modules/npm/bin/npm-cli.js" `
+            install -g "openclaw@${{ steps.ver.outputs.OPENCLAW_VERSION }}" `
+            --prefix "dist/core/openclaw-pkg" --allow-scripts=openclaw
 
-          ./node/node.exe ./node/node_modules/npm/bin/npm-cli.js \
-            install -g openclaw@latest \
-            --prefix openclaw-pkg \
-            --registry https://registry.npmmirror.com
-
-      - name: Copy scripts
-        shell: bash
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
+      - name: GATE 1 - install smoke (openclaw --version)
+        shell: pwsh
         run: |
-          cp start.bat stop.bat check.bat dist/OpenClaw-Portable-${{ env.VERSION }}-windows-offline/ || true
+          $out = & "dist/core/node/node.exe" "dist/core/openclaw-pkg/node_modules/openclaw/openclaw.mjs" --version 2>&1
+          "install smoke says: $out"
+          if ($LASTEXITCODE -ne 0) { throw "GATE 1 FAILED: openclaw --version exited $LASTEXITCODE (lifecycle guard? broken install?)" }
+          if ($out -notmatch [regex]::Escape("${{ steps.ver.outputs.OPENCLAW_VERSION }}")) { throw "GATE 1 FAILED: expected ${{ steps.ver.outputs.OPENCLAW_VERSION }}, got: $out" }
 
-      - name: Create archive
-        shell: bash
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
+      - name: Fetch Ollama (pinned, CPU-only exe)
+        shell: pwsh
         run: |
-          cd dist
-          tar -czf OpenClaw-Portable-${{ env.VERSION }}-windows-offline.tar.gz \
-            OpenClaw-Portable-${{ env.VERSION }}-windows-offline
+          $zip = "ollama-windows-amd64.zip"
+          $url = "https://github.com/ollama/ollama/releases/download/${{ steps.ver.outputs.OLLAMA_VERSION }}/$zip"
+          Invoke-WebRequest $url -OutFile "$env:RUNNER_TEMP/$zip"
+          Expand-Archive "$env:RUNNER_TEMP/$zip" -DestinationPath "$env:RUNNER_TEMP/ollama"
+          # The full amd64 zip ships GPU provider libraries (~1.2 GB);
+          # the portable build is CPU-only.
+          New-Item -ItemType Directory -Force -Path "dist/core/ollama" | Out-Null
+          Copy-Item "$env:RUNNER_TEMP/ollama/ollama.exe" "dist/core/ollama/"
+          Get-Item "dist/core/ollama/ollama.exe" | Format-List Name, Length
 
-          ls -lh OpenClaw-Portable-${{ env.VERSION }}-windows-offline.tar.gz
+      - name: Stage core package
+        shell: pwsh
+        run: |
+          foreach ($item in @('scripts', 'config', 'models', 'start.bat', 'stop.bat', 'check.bat', 'cleanup.bat', 'restart.bat', 'apply-config.bat', 'config.bat', 'open-config.bat', 'config.html', 'install-models.js', 'VERSIONS', 'LICENSE', 'README.md', 'README_CN.md')) {
+            if (Test-Path $item) { Copy-Item -Recurse $item "dist/core/" }
+            else { Write-Warning "missing expected item: $item" }
+          }
+          # models/ ships Modelfile + license only; the GGUF lives in the model package.
 
-      - name: Upload to Artifacts
+      - name: GATE 2 - core content assertions
+        shell: pwsh
+        run: |
+          $must = @(
+            'dist/core/node/node.exe',
+            'dist/core/openclaw-pkg/node_modules/openclaw/openclaw.mjs',
+            'dist/core/ollama/ollama.exe',
+            'dist/core/models/Modelfile.qwen3-1.7b',
+            'dist/core/config/openclaw.json',
+            'dist/core/scripts/set-portable-config.js',
+            'dist/core/scripts/import-model.js',
+            'dist/core/start.bat'
+          )
+          foreach ($p in $must) {
+            if (-not (Test-Path $p)) { throw "GATE 2 FAILED: core package missing $p" }
+          }
+          $size = (Get-ChildItem 'dist/core' -Recurse | Measure-Object -Property Length -Sum).Sum
+          "core package size: $([math]::Round($size/1MB,1)) MB"
+          if ($size -lt 500MB) { throw "GATE 2 FAILED: core package suspiciously small (<500MB) - $size bytes" }
+
+      - name: Pack core (uncompressed tar; contents already compressed)
+        shell: pwsh
+        run: |
+          tar -C dist/core -cf "dist/OpenClaw-Portable-${{ steps.ver.outputs.RELEASE }}-windows-core.tar" .
+
+      - name: Fetch model GGUF (pinned sha256)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path 'dist/model-staging' | Out-Null
+          $url = (Get-Content VERSIONS | Where-Object { $_ -match '^MODEL_HF_URL=' }) -replace '^MODEL_HF_URL=', ''
+          $gguf = 'dist/model-staging/qwen3-1.7b.Q4_K_M.gguf'
+          Invoke-WebRequest $url -OutFile $gguf
+          $h = (Get-FileHash $gguf -Algorithm SHA256).Hash.ToLower()
+          "gguf sha256: $h"
+          if ($h -ne '3d0b790534fe4b79525fc3692950408dca41171676ed7e21db57af5c65ef6ab6') {
+            throw "GATE 3 FAILED: GGUF hash mismatch (expected 3d0b7905...)"
+          }
+
+      - name: Stage + split model package (parts < 900 MB for release upload)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path 'dist/model/models' | Out-Null
+          $gguf = 'dist/model-staging/qwen3-1.7b.Q4_K_M.gguf'
+          $bytes = [System.IO.File]::ReadAllBytes($gguf)
+          $total = $bytes.Length
+          $chunk = 900MB
+          $i = 1
+          while ($i -lt $total) {
+            $n = [Math]::Min($chunk, $total - $i)
+            [System.IO.File]::WriteAllBytes("dist/model/models/qwen3-1.7b.Q4_K_M.gguf.part$i", $bytes[($i-1)..($i-1+$n-1)])
+            $i += $n
+          }
+          Copy-Item 'models/Modelfile.qwen3-1.7b' 'dist/model/models/'
+          Copy-Item 'models/LICENSE.qwen3' 'dist/model/models/' -ErrorAction SilentlyContinue
+          Copy-Item 'models/REGISTRY_SOURCES.md' 'dist/model/models/' -ErrorAction SilentlyContinue
+          Remove-Item 'dist/model-staging' -Recurse
+
+      - name: GATE 4 - model content assertions
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'dist/model/models/qwen3-1.7b.Q4_K_M.gguf.part1')) { throw "GATE 4 FAILED: no part1" }
+          if (-not (Test-Path 'dist/model/models/Modelfile.qwen3-1.7b')) { throw "GATE 4 FAILED: no Modelfile" }
+          $sum = 0
+          Get-ChildItem 'dist/model/models' -Filter 'qwen3-1.7b.Q4_K_M.gguf.part*' | ForEach-Object { $sum += $_.Length }
+          "model package total: $([math]::Round($sum/1MB,1)) MB"
+          if ($sum -lt 1000MB) { throw "GATE 4 FAILED: model parts total < 1GB - the model is NOT in this package (issue #58 scenario)" }
+
+      - name: Pack model package
+        shell: pwsh
+        run: |
+          tar -C dist/model -cf "dist/OpenClaw-Portable-${{ steps.ver.outputs.RELEASE }}-windows-model.tar" models
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
         with:
-          name: openclaw-portable-${{ env.VERSION }}-windows-offline
-          path: dist/OpenClaw-Portable-${{ env.VERSION }}-windows-offline.tar.gz
-          retention-days: 90
-          compression-level: 0
+          name: windows-packages
+          path: |
+            dist/OpenClaw-Portable-*-windows-core.tar
+            dist/OpenClaw-Portable-*-windows-model.tar
+          retention-days: 7
 
-  build-online:
-    runs-on: windows-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Create directory structure
-        shell: bash
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
-        run: |
-          mkdir -p dist/OpenClaw-Portable-${{ env.VERSION }}-windows-online/node
-
-      - name: Download Node.js
-        shell: bash
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
-        run: |
-          curl -fsSL \
-            "https://nodejs.org/dist/v22.16.0/node-v22.16.0-win-x64.zip" \
-            -o /tmp/node.zip
-
-          unzip -q /tmp/node.zip -d /tmp/
-          mv /tmp/node-v22.16.0-win-x64/* dist/OpenClaw-Portable-${{ env.VERSION }}-windows-online/node/
-          rm -rf /tmp/node.zip /tmp/node-v22.16.0-win-x64
-
-      - name: Install OpenClaw
-        shell: bash
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
-        run: |
-          cd dist/OpenClaw-Portable-${{ env.VERSION }}-windows-online
-
-          ./node/node.exe ./node/node_modules/npm/bin/npm-cli.js \
-            install -g openclaw@latest \
-            --prefix openclaw-pkg \
-            --registry https://registry.npmmirror.com
-
-      - name: Copy scripts
-        shell: bash
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
-        run: |
-          cp start.bat stop.bat check.bat dist/OpenClaw-Portable-${{ env.VERSION }}-windows-online/ || true
-
-      - name: Create archive
-        shell: bash
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
-        run: |
-          cd dist
-          tar -czf OpenClaw-Portable-${{ env.VERSION }}-windows-online.tar.gz \
-            OpenClaw-Portable-${{ env.VERSION }}-windows-online
-
-          ls -lh OpenClaw-Portable-${{ env.VERSION }}-windows-online.tar.gz
-
-      - name: Upload to Artifacts
-        uses: actions/upload-artifact@v4
-        env:
-          VERSION: ${{ github.event.release.tag_name }}
-        with:
-          name: openclaw-portable-${{ env.VERSION }}-windows-online
-          path: dist/OpenClaw-Portable-${{ env.VERSION }}-windows-online.tar.gz
-          retention-days: 90
-          compression-level: 0
-
-  upload-to-release:
-    needs: [build-offline, build-online]
+  # ---------------------------------------------------------------------------
+  build-linux:
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
-    env:
-      VERSION: ${{ github.event.release.tag_name }}
-
+    timeout-minutes: 90
     steps:
-      - name: Download offline artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: openclaw-portable-${{ env.VERSION }}-windows-offline
-          path: ./packages
+      - uses: actions/checkout@v4
 
-      - name: Download online artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: openclaw-portable-${{ env.VERSION }}-windows-online
-          path: ./packages
-
-      - name: List packages
-        run: ls -lh packages/
-
-      - name: Upload to Release using curl
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch Node.js (pinned)
         run: |
-          cd packages
-          
-          # Get upload URL from release
-          UPLOAD_URL=$(curl -s \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.event.release.tag_name }}" | \
-            jq -r '.upload_url' | sed 's/{?name,label}//')
-          
-          echo "Upload URL: $UPLOAD_URL"
-          echo ""
-          
-          # Upload each file
-          for file in *.tar.gz; do
-            echo "📤 Uploading $file..."
-            
-            RESPONSE=$(curl -s -w "\n%{http_code}" \
-              -X POST \
-              -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Content-Type: application/gzip" \
-              --data-binary @"$file" \
-              "${UPLOAD_URL}?name=${file}")
-            
-            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-            BODY=$(echo "$RESPONSE" | head -n -1)
-            
-            if [ "$HTTP_CODE" -eq 201 ]; then
-              echo "✅ $file uploaded successfully"
-            else
-              echo "❌ Failed to upload $file (HTTP $HTTP_CODE)"
-              echo "Response: $BODY"
-            fi
-            echo ""
+          v=$(grep '^NODE_VERSION=' VERSIONS | cut -d= -f2)
+          curl -fsSL "https://nodejs.org/dist/$v/node-$v-linux-x64.tar.gz" -o /tmp/node.tgz
+          mkdir -p dist/core/node
+          tar -xzf /tmp/node.tgz -C dist/core/node --strip-components=1
+          dist/core/node/node --version
+
+      - name: Install openclaw (pinned, lifecycle scripts allowed)
+        run: |
+          ov=$(grep '^OPENCLAW_VERSION=' VERSIONS | cut -d= -f2)
+          dist/core/node/node dist/core/node/node_modules/npm/bin/npm-cli.js \
+            install -g "openclaw@$ov" --prefix dist/core/openclaw-pkg --allow-scripts=openclaw
+
+      - name: GATE 1 - install smoke (openclaw --version)
+        run: |
+          ov=$(grep '^OPENCLAW_VERSION=' VERSIONS | cut -d= -f2)
+          out=$(dist/core/node/node dist/core/openclaw-pkg/node_modules/openclaw/openclaw.mjs --version)
+          echo "install smoke says: $out"
+          echo "$out" | grep -q "$ov" || { echo "GATE 1 FAILED: version mismatch"; exit 1; }
+
+      - name: Fetch Ollama (pinned, CPU-only)
+        run: |
+          ovl=$(grep '^OLLAMA_VERSION=' VERSIONS | cut -d= -f2)
+          curl -fsSL "https://github.com/ollama/ollama/releases/download/$ovl/ollama-linux-amd64.tar.zst" -o /tmp/ollama.tar.zst
+          command -v zstd >/dev/null || sudo apt-get install -y zstd
+          zstd -d -q -o /tmp/ollama.tar /tmp/ollama.tar.zst
+          mkdir -p /tmp/ollama-pkg
+          tar -xf /tmp/ollama.tar -C /tmp/ollama-pkg
+          # tarball layout (verified 2026-09-06): bin/ollama + lib/ollama at root
+          mkdir -p dist/core/ollama
+          cp /tmp/ollama-pkg/bin/ollama dist/core/ollama/ollama
+          if [ -d /tmp/ollama-pkg/lib/ollama ]; then
+            cp -r /tmp/ollama-pkg/lib/ollama dist/core/ollama/lib
+            rm -rf dist/core/ollama/lib/nvidia dist/core/ollama/lib/rocm
+          fi
+          chmod +x dist/core/ollama/ollama
+
+      - name: Stage core package
+        run: |
+          for item in scripts config models start.sh stop.sh check.sh cleanup.sh \
+                     VERSIONS LICENSE README.md README_CN.md; do
+            [ -e "$item" ] && cp -r "$item" dist/core/ || echo "missing: $item"
           done
-          
-          echo "🎉 Upload complete!"
+          chmod +x dist/core/start.sh dist/core/stop.sh dist/core/check.sh dist/core/cleanup.sh
+
+      - name: GATE 2 - core content assertions
+        run: |
+          for p in dist/core/node/node \
+                   dist/core/openclaw-pkg/node_modules/openclaw/openclaw.mjs \
+                   dist/core/ollama/ollama \
+                   dist/core/models/Modelfile.qwen3-1.7b \
+                   dist/core/config/openclaw.json \
+                   dist/core/scripts/set-portable-config.js \
+                   dist/core/scripts/import-model.js \
+                   dist/core/start.sh; do
+            [ -e "$p" ] || { echo "GATE 2 FAILED: missing $p"; exit 1; }
+          done
+          size=$(du -sb dist/core | cut -f1)
+          echo "core package size: $((size/1024/1024)) MB"
+          [ "$size" -gt 524288000 ] || { echo "GATE 2 FAILED: core < 500MB"; exit 1; }
+
+      - name: Pack core (uncompressed tar)
+        run: |
+          tar -C dist/core -cf "dist/OpenClaw-Portable-${{ inputs.VERSION }}-linux-core.tar" .
+
+      - name: Fetch model GGUF (pinned sha256)
+        run: |
+          url=$(grep '^MODEL_HF_URL=' VERSIONS | cut -d= -f2)
+          mkdir -p dist/model-staging
+          curl -fsSL "$url" -o dist/model-staging/qwen3-1.7b.Q4_K_M.gguf
+          h=$(sha256sum dist/model-staging/qwen3-1.7b.Q4_K_M.gguf | awk '{print $1}')
+          echo "gguf sha256: $h"
+          [ "$h" = "3d0b790534fe4b79525fc3692950408dca41171676ed7e21db57af5c65ef6ab6" ] || { echo "GATE 3 FAILED: hash mismatch"; exit 1; }
+
+      - name: Stage + split model package
+        run: |
+          mkdir -p dist/model/models
+          cd dist/model-staging
+          split -b 900m qwen3-1.7b.Q4_K_M.gguf qwen3-1.7b.Q4_K_M.gguf.part-
+          i=1
+          for p in qwen3-1.7b.Q4_K_M.gguf.part-*; do
+            mv "$p" "../../dist/model/models/qwen3-1.7b.Q4_K_M.gguf.part$i"
+            i=$((i+1))
+          done
+          cd ../..
+          cp models/Modelfile.qwen3-1.7b models/LICENSE.qwen3 models/REGISTRY_SOURCES.md dist/model/models/
+
+      - name: GATE 4 - model content assertions
+        run: |
+          [ -e 'dist/model/models/qwen3-1.7b.Q4_K_M.gguf.part1' ] || { echo "GATE 4 FAILED: no part1"; exit 1; }
+          [ -e 'dist/model/models/Modelfile.qwen3-1.7b' ] || { echo "GATE 4 FAILED: no Modelfile"; exit 1; }
+          sum=0
+          for p in dist/model/models/qwen3-1.7b.Q4_K_M.gguf.part*; do sum=$((sum + $(stat -c%s "$p"))); done
+          echo "model package total: $((sum/1024/1024)) MB"
+          [ "$sum" -gt 1048576000 ] || { echo "GATE 4 FAILED: model < 1GB (#58 scenario)"; exit 1; }
+
+      - name: Pack model package
+        run: |
+          tar -C dist/model -cf "dist/OpenClaw-Portable-${{ inputs.VERSION }}-linux-model.tar" models
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            dist/OpenClaw-Portable-*-linux-core.tar
+            dist/OpenClaw-Portable-*-linux-model.tar
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  smoke-windows:
+    needs: build-windows
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-packages
+          path: artifacts
+
+      - name: Extract core + model
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path smoke/core | Out-Null
+          New-Item -ItemType Directory -Force -Path smoke/model | Out-Null
+          $core = Get-ChildItem artifacts -Filter '*windows-core.tar' | Select-Object -First 1
+          tar -xf $core.FullName -C smoke/core
+          $model = Get-ChildItem artifacts -Filter '*windows-model.tar' | Select-Object -First 1
+          tar -xf $model.FullName -C smoke/model
+
+      - name: GATE 5/6 - reassemble model, import, gateway start + RESTART regression (#138488)
+        shell: pwsh
+        run: |
+          $core = 'smoke/core'
+          $node = "$core/node/node.exe"
+          $mjs  = "$core/openclaw-pkg/node_modules/openclaw/openclaw.mjs"
+          $oll  = "$core/ollama/ollama.exe"
+          $store = 'smoke/modelstore'
+          # --- GATE 5: parts reassemble byte-identical ---
+          $out = [System.IO.File]::Create("smoke/qwen3-1.7b.Q4_K_M.gguf")
+          $i = 1
+          while (Test-Path "smoke/model/models/qwen3-1.7b.Q4_K_M.gguf.part$i") {
+            $b = [System.IO.File]::ReadAllBytes("smoke/model/models/qwen3-1.7b.Q4_K_M.gguf.part$i")
+            $out.Write($b, 0, $b.Length)
+            $i++
+          }
+          $out.Close()
+          $h = (Get-FileHash "smoke/qwen3-1.7b.Q4_K_M.gguf" -Algorithm SHA256).Hash.ToLower()
+          if ($h -ne '3d0b790534fe4b79525fc3692950408dca41171676ed7e21db57af5c65ef6ab6') {
+            throw "GATE 5 FAILED: reassembled GGUF hash mismatch ($h)"
+          }
+          Write-Host "GATE 5 passed: reassembled GGUF byte-identical"
+          # --- model import (exercises scripts/import-model.js) ---
+          $env:OLLAMA_MODELS = $store
+          Start-Process $oll -ArgumentList 'serve'
+          $up = $false
+          for ($t=0; $t -lt 60; $t++) {
+            if (curl.exe -sf http://127.0.0.1:11434/api/version -o $null) { $up = $true; break }
+            Start-Sleep 1
+          }
+          if (-not $up) { throw "ollama server did not come up" }
+          & $node "$core/scripts/import-model.js" $oll "$core/models/Modelfile.qwen3-1.7b" "smoke/qwen3-1.7b.Q4_K_M.gguf" "qwen3:1.7b"
+          if ($LASTEXITCODE -ne 0) { throw "GATE 5 FAILED: model import" }
+          # --- config ---
+          & $node "$core/scripts/set-portable-config.js" "$core/config/openclaw.json" "$core/state" "18799" "11434" "ollama/qwen3:1.7b"
+          if ($LASTEXITCODE -ne 0) { throw "config generation failed" }
+          $tok = -join ((1..32) | ForEach-Object { '0123456789abcdef'[(Get-Random -Maximum 16)] })
+          $env:OPENCLAW_STATE_DIR = "$core/state"
+          # --- GATE 6: start ---
+          $g1 = Start-Process $node -ArgumentList @("$mjs", 'gateway', 'run', '--port', '18799', '--allow-unconfigured', '--bind', 'loopback', '--token', $tok) -PassThru -RedirectStandardOutput smoke/gw1.log -RedirectStandardError smoke/gw1.err
+          $ok = $false
+          for ($t=0; $t -lt 90; $t++) {
+            try { if ((curl.exe -sf http://127.0.0.1:18799/health | ConvertFrom-Json).ok) { $ok = $true; break } } catch {}
+            Start-Sleep 1
+          }
+          if (-not $ok) { Get-Content smoke/gw1.log -Tail 20; throw "GATE 6 FAILED: gateway not healthy" }
+          Write-Host "GATE 6a passed: gateway #1 healthy"
+          # --- GATE 6: RESTART (the #138488 regression point) ---
+          if (-not $g1.WaitForExit(15000)) { $g1.Kill() }
+          Start-Sleep 2
+          $g2 = Start-Process $node -ArgumentList @("$mjs", 'gateway', 'run', '--port', '18799', '--allow-unconfigured', '--bind', 'loopback', '--token', $tok) -PassThru -RedirectStandardOutput smoke/gw2.log -RedirectStandardError smoke/gw2.err
+          $ok2 = $false
+          for ($t=0; $t -lt 90; $t++) {
+            try { if ((curl.exe -sf http://127.0.0.1:18799/health | ConvertFrom-Json).ok) { $ok2 = $true; break } } catch {}
+            Start-Sleep 1
+          }
+          if (-not $ok2) { Get-Content smoke/gw2.log -Tail 20; throw "GATE 6 FAILED: gateway did NOT restart (#138488-class regression)" }
+          Write-Host "GATE 6b passed: gateway #2 (restart) healthy"
+          $g2.Kill() | Out-Null
+          Get-Process ollama -ErrorAction SilentlyContinue | Stop-Process -Force
+          Write-Host "ALL SMOKE GATES PASSED"
+
+  # ---------------------------------------------------------------------------
+  release:
+    needs: [build-windows, build-linux, smoke-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ always() && needs.build-windows.result == 'success' && needs.build-linux.result == 'success' && needs.smoke-windows.result == 'success' }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-packages
+          path: artifacts/windows
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-packages
+          path: artifacts/linux
+
+      - name: Create / update release + upload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES: |
+            # OpenClaw Portable
+
+            ## What changed
+            - **The offline package is actually offline now.** v6.0.2 shipped a
+              159 MB "offline" package with no model inside (issue #58). v7 ships
+              a core package (Node + openclaw + Ollama, pinned versions) and a
+              model package (qwen3-1.7b GGUF) with CI content assertions — a
+              release cannot be published without the model actually in the tar.
+            - Local LLM stack: llama.cpp -> Ollama native API; tool calling
+              verified end-to-end (issue #52).
+            - Pinned versions (see VERSIONS): openclaw 2026.8.2, Node 26.8.1,
+              Ollama 0.33.3.
+            - Windows scripts: pure-ASCII batch (#57), correct port logic (#56),
+              no system-wide taskkill.
+            - Linux: no USB mount point required (#40).
+            - Gateway token per boot, never on disk. Loopback-only bind.
+
+            ## Install
+            Extract the core tar, then extract the model tar into the SAME
+            directory (its models/ parts merge in), then start.bat / start.sh.
+        run: |
+          set -euo pipefail
+          v="${{ inputs.VERSION }}"
+          if ! gh release view "$v" >/dev/null 2>&1; then
+            gh release create "$v" --title "OpenClaw Portable $v" --notes "$RELEASE_NOTES"
+          fi
+          for f in artifacts/windows/*.tar artifacts/linux/*.tar; do
+            sz=$(stat -c%s "$f")
+            echo "uploading $f ($sz bytes)"
+            gh release upload "$v" "$f" --clobber
+          done

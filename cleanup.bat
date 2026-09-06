@@ -1,150 +1,85 @@
 @echo off
-rem OpenClaw Portable - 敏感文件清理工具
-rem Issue #43 修复：零痕迹设计
-
+rem ============================================
+rem  OpenClaw Portable v7 - zero-trace cleanup
+rem  (issue #43: safe to remove USB drive)
+rem  English output on purpose (ASCII-safe file).
+rem ============================================
 setlocal enabledelayedexpansion
-title OpenClaw Portable - 清理工具
+title OpenClaw Portable v7 - Cleanup
+chcp 65001 >nul
 
 set "SCRIPT_DIR=%~dp0"
 if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
-set "DATA_DIR=%SCRIPT_DIR%\data\.openclaw"
+set "DATA_DIR=%SCRIPT_DIR%\data"
+set "STATE_DIR=%DATA_DIR%\.openclaw"
 
 echo.
 echo ==========================================
-echo   OpenClaw Portable - 清理工具
+echo   OpenClaw Portable v7 - Cleanup
 echo ==========================================
 echo.
 
-rem ============================================
-rem 1. 检测敏感文件
-rem ============================================
-echo [检测] 扫描敏感文件...
-echo.
-
-set FILE_COUNT=0
-
-rem 检测配置文件
-if exist "%DATA_DIR%\openclaw.json" (
-    set /a FILE_COUNT+=1
-    echo   [!] openclaw.json (包含 API Key^)
+echo [Scan] Checking for user data and sensitive files...
+set "HAS=0"
+if exist "%STATE_DIR%" (
+    set "HAS=1"
+    echo   [!] data\.openclaw (config incl. API keys, sessions, auth)
 )
-
-rem 检测备份目录
-if exist "%DATA_DIR%\backups\" (
-    set /a FILE_COUNT+=1
-    echo   [!] backups\ (配置备份^)
+if exist "%DATA_DIR%\workspace" (
+    set "HAS=1"
+    echo   [!] data\workspace (agent workspace files)
 )
-
-rem 检测 token 文件
-if exist "%DATA_DIR%\.gateway_token" (
-    set /a FILE_COUNT+=1
-    echo   [!] .gateway_token (访问令牌^)
+for %%f in ("%DATA_DIR%\gateway.log" "%DATA_DIR%\ollama.log") do (
+    if exist "%%f" (
+        set "HAS=1"
+        echo   [!] %%~f (runtime log)
+    )
 )
+if exist "%DATA_DIR%\qwen3:1.7b.Q4_K_M.gguf" echo   [info] data\qwen3:1.7b.Q4_K_M.gguf (assembled model - public data, kept by default)
 
-rem 检测日志文件
-if exist "%SCRIPT_DIR%\llm\server.log" (
-    set /a FILE_COUNT+=1
-    echo   [!] llm\server.log (运行日志^)
-)
-
-rem 检测 PID 文件
-if exist "%SCRIPT_DIR%\llm\server.pid" (
-    set /a FILE_COUNT+=1
-    echo   [!] llm\server.pid (进程 ID^)
-)
-
-if !FILE_COUNT!==0 (
+if "%HAS%"=="0" (
     echo.
-    echo [OK] 未发现敏感文件
+    echo [OK] No user data found. Safe to remove the drive.
     echo.
     pause
     exit /b 0
 )
 
 echo.
-echo [选项] 请选择清理级别：
+echo Choose cleanup level:
 echo.
-echo   [1] 轻度清理 - 仅清理日志和 PID 文件
-echo   [2] 深度清理 - 清理所有敏感文件（需重新配置）
-echo   [3] 取消
+echo   [1] Light  - logs only
+echo   [2] Deep   - ALL user data (API keys, sessions, workspace)
+echo   [3] Cancel
 echo.
+set /p "Choice (1-3): " CHOICE
 
-set /p "请选择 (1-3): " CHOICE
-
-if "!CHOICE!"=="1" goto LIGHT_CLEANUP
-if "!CHOICE!"=="2" goto DEEP_CLEANUP
-if "!CHOICE!"=="3" goto CANCEL
-echo.
-echo [错误] 无效选择
-goto CANCEL
-
-:LIGHT_CLEANUP
-echo.
-echo [清理] 轻度清理...
-
-if exist "%SCRIPT_DIR%\llm\server.log" (
-    del /f /q "%SCRIPT_DIR%\llm\server.log" 2>nul
-    echo   [OK] 已删除 llm\server.log
-)
-
-if exist "%SCRIPT_DIR%\llm\server.pid" (
-    del /f /q "%SCRIPT_DIR%\llm\server.pid" 2>nul
-    echo   [OK] 已删除 llm\server.pid
-)
-
-echo.
-echo [完成] 轻度清理完成
-echo   配置文件已保留，可安全拔出 U盘
+if "%CHOICE%"=="1" goto LIGHT
+if "%CHOICE%"=="2" goto DEEP
 goto END
 
-:DEEP_CLEANUP
-echo.
-echo [警告] 深度清理将删除所有敏感文件！
-echo   包括：API Key、配置备份、访问令牌等
-echo.
-set /p "确认深度清理？(yes/N): " CONFIRM
-
-if not "!CONFIRM!"=="yes" goto CANCEL
-
-echo.
-echo [清理] 深度清理...
-
-if exist "%DATA_DIR%\openclaw.json" (
-    del /f /q "%DATA_DIR%\openclaw.json" 2>nul
-    echo   [OK] 已删除 openclaw.json
-)
-
-if exist "%DATA_DIR%\backups\" (
-    rd /s /q "%DATA_DIR%\backups\" 2>nul
-    echo   [OK] 已删除 backups\
-)
-
-if exist "%DATA_DIR%\.gateway_token" (
-    del /f /q "%DATA_DIR%\.gateway_token" 2>nul
-    echo   [OK] 已删除 .gateway_token
-)
-
-if exist "%SCRIPT_DIR%\llm\server.log" (
-    del /f /q "%SCRIPT_DIR%\llm\server.log" 2>nul
-    echo   [OK] 已删除 llm\server.log
-)
-
-if exist "%SCRIPT_DIR%\llm\server.pid" (
-    del /f /q "%SCRIPT_DIR%\llm\server.pid" 2>nul
-    echo   [OK] 已删除 llm\server.pid
-)
-
-echo.
-echo [完成] 深度清理完成
-echo   下次启动需要重新配置 API Key
+:LIGHT
+echo [Cleaning] Logs...
+if exist "%DATA_DIR%\gateway.log" del /f /q "%DATA_DIR%\gateway.log"
+if exist "%DATA_DIR%\ollama.log" del /f /q "%DATA_DIR%\ollama.log"
+echo [Done] Light cleanup - config and sessions preserved.
 goto END
 
-:CANCEL
-echo 已取消
-goto END
+:DEEP
+echo.
+set /p "Deep cleanup removes ALL config incl. API keys. Confirm? (yes/N): " CONFIRM
+if /i not "%CONFIRM%"=="yes" goto END
+echo [Cleaning] All user data...
+if exist "%STATE_DIR%" rd /s /q "%STATE_DIR%"
+if exist "%DATA_DIR%\workspace" rd /s /q "%DATA_DIR%\workspace"
+if exist "%DATA_DIR%\gateway.log" del /f /q "%DATA_DIR%\gateway.log"
+if exist "%DATA_DIR%\ollama.log" del /f /q "%DATA_DIR%\ollama.log"
+echo [Done] Deep cleanup - next start regenerates config fresh.
 
 :END
 echo.
-echo [完成] 清理完成，可安全拔出 U盘
+echo [OK] Cleanup complete. Safe to remove the drive.
+echo     (data\ollama-models and the bundled model are public model files - kept.)
 echo.
 pause
+exit /b 0

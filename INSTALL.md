@@ -1,75 +1,47 @@
-# OpenClaw Portable - 安装说明
+# Install (v7)
 
-## 🎯 三步上手
+## Prerequisites
 
-### 步骤 1: 解压到 U盘
+None for users. No Node, no npm, no admin rights, no GPU — everything is
+bundled (see `VERSIONS` for exact pinned versions).
+
+## Windows
+
+1. Extract `OpenClaw-Portable-<ver>-windows-core.tar` (e.g. with 7-Zip or
+   Windows' built-in Tar support) into a folder with enough free space:
+   ~1.2 GB for core + 1.3 GB for model files + ~2 GB runtime headroom in
+   `data/` (assembled model + Ollama model store).
+2. Extract `OpenClaw-Portable-<ver>-windows-model.tar` into the SAME folder
+   (its `models/` split parts merge in).
+3. Run `start.bat`.
+
+USB tips:
+
+- Use exFAT or NTFS if the stick is >4 GB and you plan to store session
+  data; FAT32 works for the shipped files (all parts < 4 GB) but keeps
+  `data/` small.
+- After a session on a shared machine: run `cleanup.bat` before unmounting.
+
+## Linux
 
 ```bash
-# Linux/macOS
-tar -xzf openclaw-portable.tar.gz -C /media/usb/
-
-# Windows (使用 7-Zip 或 WinRAR)
-右键 → 解压到U盘
-```
-
-### 步骤 2: 启动
-
-**Windows 用户:**
-```
-双击 start.bat
-```
-
-**Linux/macOS 用户:**
-```bash
-chmod +x start.sh
+tar xf OpenClaw-Portable-<ver>-linux-core.tar
+tar xf OpenClaw-Portable-<ver>-linux-model.tar
+chmod +x start.sh stop.sh check.sh cleanup.sh   # already set by CI, harmless
 ./start.sh
 ```
 
-### 步骤 3: 访问
+Works from any folder or filesystem — no USB mount point required
+(issue #40). Requires an x86-64 CPU; for arm64 Linux see the roadmap.
 
-浏览器打开: http://localhost:3000
+## Cloud-only install (no local model)
 
----
+Core package alone = cloud mode. `start.*` detects the missing model and
+boots with a cloud default; then open `config.html` (or
+`apply-config.bat`) to set your API key.
 
-## 📦 已包含内容
+## Uninstall
 
-- ✅ **Node.js 20.11.0** - 无需下载
-- ✅ **启动/关闭脚本** - 一键操作
-- ✅ **完整文档** - README.md
-
----
-
-## 🔧 首次使用
-
-首次启动时，脚本会自动：
-1. 检测 U盘中的 Node.js
-2. 安装 Git（如果缺失）
-3. 安装 OpenClaw（如果缺失）
-4. 创建配置文件
-
----
-
-## 🌐 国内用户
-
-**好消息：** Node.js 已预置，无需下载！
-
-首次安装 Git 和 OpenClaw 时，会自动使用国内镜像加速。
-
----
-
-## ❓ 常见问题
-
-### Q: 启动失败怎么办？
-
-A: 确保：
-1. WSL2 已安装（Windows 用户）
-2. U盘路径正确
-3. 运行 `check.bat` 检查环境
-
-### Q: 如何更新 Node.js？
-
-A: 下载新版本的 Node.js，替换 `node/` 目录即可。
-
----
-
-**需要帮助？** 查看完整文档: [README.md](README.md)
+Stop with `stop.bat` / `stop.sh`, then delete the folder. Everything the
+portable touches lives inside it (state under `data/`), so nothing else is
+left on the machine.

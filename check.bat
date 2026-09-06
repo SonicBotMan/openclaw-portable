@@ -1,101 +1,89 @@
 @echo off
-chcp 65001 >nul
 setlocal enabledelayedexpansion
-title OpenClaw Portable - Environment Check
-
-echo.
-echo ========================================
-echo    OpenClaw Portable - Environment Check
-echo ========================================
-echo.
+chcp 65001 >nul
+title OpenClaw Portable v7 - Environment Check
 
 set "SCRIPT_DIR=%~dp0"
 if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
-
-set "NODE_EXE=%SCRIPT_DIR%\node\node.exe"
-set "NPM_CLI=%SCRIPT_DIR%\node\node_modules\npm\bin\npm-cli.js"
-set "OPENCLAW_ENTRY=%SCRIPT_DIR%\openclaw-pkg\node_modules\openclaw\bin\openclaw"
-set "GATEWAY_PORT=18789"
+set "NODE=%SCRIPT_DIR%\node\node.exe"
+set "OPENCLAW_MJS=%SCRIPT_DIR%\openclaw-pkg\node_modules\openclaw\openclaw.mjs"
+set "OLLAMA_EXE=%SCRIPT_DIR%\ollama\ollama.exe"
+set "MODEL_ID=qwen3:1.7b"
+set "MODEL_FILE=qwen3-1.7b"
 
 set PASS=0
 set FAIL=0
 
-rem ----------------------------------------
-rem [1] Node.js
-rem ----------------------------------------
-echo [Check 1/4] Node.js (node\node.exe)...
-if exist "%NODE_EXE%" (
-    for /f "tokens=*" %%v in ('"%NODE_EXE%" --version 2^>^&1') do set NODE_VER=%%v
-    echo    OK  Node.js !NODE_VER! is ready
-    set /a PASS+=1
+echo.
+echo ==========================================
+echo   OpenClaw Portable v7 - Environment Check
+echo ==========================================
+echo.
+
+echo [Check 1/5] Node.js...
+if exist "%NODE%" (
+    for /f "tokens=*" %%v in ('"%NODE%" --version 2^>nul') do echo   [OK]   Node %%v
+    "%NODE%" -e "const [a,b]=process.versions.node.split('.').map(Number); process.exit(a>22||(a===22&&b>=22)||(a>=24)?0:1)" >nul 2>&1
+    if errorlevel 1 (
+        echo   [FAIL] OpenClaw requires Node ^>=22.22.3 - this package is stale
+        set /a FAIL+=1
+    ) else (
+        echo   [OK]   meets OpenClaw engine requirement
+        set /a PASS+=1
+    )
 ) else (
-    echo    FAIL node\node.exe not found
+    echo   [FAIL] node\node.exe not found - download the CORE package
     set /a FAIL+=1
 )
 
-rem ----------------------------------------
-rem [2] OpenClaw
-rem ----------------------------------------
-echo.
-echo [Check 2/4] OpenClaw (openclaw-pkg)...
-if exist "%OPENCLAW_ENTRY%" (
-    echo    OK  OpenClaw is installed
-    set /a PASS+=1
+echo [Check 2/5] OpenClaw...
+if exist "%OPENCLAW_MJS%" (
+    "%NODE%" "%OPENCLAW_MJS%" --version >nul 2>&1
+    if errorlevel 1 (
+        echo   [FAIL] openclaw --version failed (re-download the core package)
+        set /a FAIL+=1
+    ) else (
+        for /f "tokens=*" %%v in ('"%NODE%" "%OPENCLAW_MJS%" --version 2^>nul') do echo   [OK]   OpenClaw %%v (install verified)
+        set /a PASS+=1
+    )
 ) else (
-    echo    FAIL OpenClaw not found in openclaw-pkg\
+    echo   [FAIL] openclaw entry not found
     set /a FAIL+=1
 )
 
-rem ----------------------------------------
-rem [3] Port availability
-rem ----------------------------------------
-echo.
-echo [Check 3/4] Port %GATEWAY_PORT%...
-netstat -aon 2>nul | findstr ":%GATEWAY_PORT%" | findstr "LISTENING" >nul
-if errorlevel 1 (
-    echo    OK  Port %GATEWAY_PORT% is available
+echo [Check 3/5] Ollama...
+if exist "%OLLAMA_EXE%" (
+    echo   [OK]   ollama bundled
     set /a PASS+=1
 ) else (
-    echo    WARN Port %GATEWAY_PORT% is in use
-    set /a FAIL+=1
+    echo   [INFO] no bundled Ollama - CLOUD mode (set an API key with apply-config.bat)
 )
 
-rem ----------------------------------------
-rem [4] Directories
-rem ----------------------------------------
-echo.
-echo [Check 4/4] Directories...
-set DIR_OK=1
-if not exist "%SCRIPT_DIR%\data" (
-    echo    WARN data\ not found
-    set DIR_OK=0
-)
-if not exist "%SCRIPT_DIR%\workspace" (
-    echo    WARN workspace\ not found
-    set DIR_OK=0
-)
-if "%DIR_OK%"=="1" (
-    echo    OK  All directories present
+echo [Check 4/5] Bundled model...
+if exist "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf" (
+    echo   [OK]   models\%MODEL_FILE%.Q4_K_M.gguf present
+    set /a PASS+=1
+) else if exist "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part1" (
+    echo   [OK]   split parts present (assembled on first start)
     set /a PASS+=1
 ) else (
-    set /a FAIL+=1
+    echo   [INFO] no local model files - CLOUD mode
 )
 
-rem ----------------------------------------
-rem Summary
-rem ----------------------------------------
-echo.
-echo ========================================
-echo   Check Complete: %PASS% passed, %FAIL% failed
-echo ========================================
-echo.
-
-if "%FAIL%"=="0" (
-    echo [OK] Environment is ready
-    echo      You can now run start.bat
-) else (
-    echo [WARN] Some checks failed
-    echo        Please fix the issues above
+echo [Check 5/5] Ports...
+for %%p in (18789 11434) do (
+    netstat -aon 2>nul | findstr /r "LISTENING" | findstr /r /c:":%%p " >nul
+    if not errorlevel 1 (
+        echo   [INFO] port %%p in use (start will fall back)
+    ) else (
+        echo   [OK]   port %%p free
+        set /a PASS+=1
+    )
 )
+
 echo.
+echo -------------------------------------------
+echo   Result: !PASS! OK, !FAIL! FAIL
+echo -------------------------------------------
 pause
+exit /b %FAIL%

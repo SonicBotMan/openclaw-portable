@@ -1,72 +1,59 @@
-# OpenClaw Portable - Git Ignore
+# OpenClaw Portable v7 — Git Ignore
 
 # ============================================
-# 敏感配置文件（包含 API Keys）
+# Runtime state (created by start scripts, never committed)
 # ============================================
-config/openclaw.json
-data/.last_usb
+data/
+
+# NOTE: config/openclaw.json IS committed — it is the v7 template with
+# __GATEWAY_PORT__/__OLLAMA_PORT__/__MODEL_PRIMARY__ placeholders. Do NOT
+# ignore it (v6 ignored it, which is why the v6.0.2 release shipped broken).
 
 # ============================================
-# 日志文件
+# Model weights (shipped via GitHub releases, not git)
+# ============================================
+models/*.gguf
+models/*.gguf.part*
+*.part1
+*.part2
+
+# ============================================
+# Bundled runtimes (shipped via CI, not git)
+# ============================================
+node/
+openclaw-pkg/
+ollama/
+llm/
+
+# ============================================
+# Logs / temp / system
 # ============================================
 *.log
 logs/
-
-# ============================================
-# 环境变量文件
-# ============================================
-*.env
-.env.*
-
-# ============================================
-# 临时文件
-# ============================================
 .temp/
 .tmp/
 *.tmp
 *.swp
 *.swo
 *~
-
-# ============================================
-# 系统文件
-# ============================================
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# ============================================
-# 备份文件
-# ============================================
 *.bak
 *.backup
 *.old
 
 # ============================================
-# Node.js（如果有）
+# Build outputs
 # ============================================
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+dist/
+*.tar
+*.tar.gz
+*.zip
 
-# ============================================
 # IDE
-# ============================================
 .vscode/
 .idea/
 *.iml
 .task-card.md
 .review.md
-dist/
-
-# llama.cpp binaries and models (distributed separately)
-llm/bin/
-llm/models/*.gguf
-llm/server.log
-llm/server.pid
-
-# Build outputs
-dist/
-*.tar.gz
-*.zip

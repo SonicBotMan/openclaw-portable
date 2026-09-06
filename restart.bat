@@ -1,61 +1,55 @@
 @echo off
 setlocal enabledelayedexpansion
-title OpenClaw Portable - Restart Gateway
+chcp 65001 >nul
+title OpenClaw Portable v7 - Restart Gateway
+rem ASCII output on purpose (code-page safe).
 
-echo.
-echo ==========================================
-echo   OpenClaw Portable - Restart Gateway
-echo ==========================================
-echo.
-
-rem === Resolve script directory ===
 set "SCRIPT_DIR=%~dp0"
 if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
-
-set "NODE_EXE=%SCRIPT_DIR%\node\node.exe"
-set "OPENCLAW_ENTRY_LINUX=%SCRIPT_DIR%\openclaw-pkg\lib\node_modules\openclaw\openclaw.mjs"
-set "OPENCLAW_ENTRY_WINDOWS=%SCRIPT_DIR%\openclaw-pkg\node_modules\openclaw\openclaw.mjs"
-
-if exist "%OPENCLAW_ENTRY_LINUX%" (
-    set "OPENCLAW_ENTRY=%OPENCLAW_ENTRY_LINUX%"
-) else if exist "%OPENCLAW_ENTRY_WINDOWS%" (
-    set "OPENCLAW_ENTRY=%OPENCLAW_ENTRY_WINDOWS%"
-) else (
-    set "OPENCLAW_ENTRY=%OPENCLAW_ENTRY_LINUX%"
-)
-
-echo [1/3] Stopping Gateway...
-taskkill /F /IM node.exe 2>nul
-timeout /t 2 /nobreak >nul
-echo [OK] Gateway stopped
+set "NODE=%SCRIPT_DIR%\node\node.exe"
+set "OPENCLAW_MJS=%SCRIPT_DIR%\openclaw-pkg\node_modules\openclaw\openclaw.mjs"
+set "DATA_DIR=%SCRIPT_DIR%\data"
+set "STATE_DIR=%DATA_DIR%\.openclaw"
+set "GW_PORT=18789"
 
 echo.
-echo [2/3] Checking configuration...
-set "CONFIG_FILE=%SCRIPT_DIR%\data\.openclaw\openclaw.json"
-if exist "%CONFIG_FILE%" (
-    echo [OK] Configuration file found
-) else (
-    echo [WARN] Configuration file not found: %CONFIG_FILE%
-    echo       Using default settings
-)
-
-echo.
-echo [3/3] Starting Gateway...
-echo.
-echo   Access URL: http://localhost:18789
-echo.
+echo ==========================================
+echo   OpenClaw Portable v7 - Restart
 echo ==========================================
 echo.
 
-start "" cmd /c "timeout /t 8 /nobreak >nul && start http://localhost:18789"
+rem [1/3] stop only THIS portable tree's processes (never a system-wide taskkill)
+echo [1/3] Stopping gateway + Ollama (this portable only)...
+"%NODE%" "%SCRIPT_DIR%\scripts\stop.js" "%SCRIPT_DIR%"
+timeout /t 2 /nobreak >nul
 
-"%NODE_EXE%" "%OPENCLAW_ENTRY%" gateway run --allow-unconfigured
-
-echo.
-if errorlevel 1 (
-    echo [ERROR] Gateway exited with an error
-) else (
-    echo [INFO] Gateway stopped normally
+rem [2/3] port
+echo [2/3] Checking ports...
+netstat -aon 2>nul | findstr /r "LISTENING" | findstr /r /c:":%GW_PORT% " >nul
+if not errorlevel 1 (
+  set "GW_PORT=18790"
 )
+
+rem [3/3] start with a fresh token (same flow as start.bat)
+echo [3/3] Starting gateway on port %GW_PORT% ...
+if not exist "%DATA_DIR%" mkdir "%DATA_DIR%"
+set "GW_TOKEN="
+for /f "tokens=*" %%t in ('"%NODE%" -e "console.log(require('crypto').randomBytes(24).toString('hex'))"') do set "GW_TOKEN=%%t"
+start "OpenClaw Gateway" /b "%NODE%" "%OPENCLAW_MJS%" gateway run --port %GW_PORT% --allow-unconfigured --bind loopback --token %GW_TOKEN% >> "%DATA_DIR%\gateway.log" 2>&1
+
 echo.
+echo Waiting for gateway...
+for /l %%i in (1,1,30) do (
+  curl.exe -sf "http://127.0.0.1:%GW_PORT%/health" >nul 2>&1 && goto :healthy
+  timeout /t 1 /nobreak >nul
+)
+echo [ERROR] Gateway not healthy in 30s - check data\gateway.log
+pause
+exit /b 1
+
+:healthy
+echo.
+echo [OK]   Gateway restarted.
+echo       UI: http://localhost:%GW_PORT%/?token=%GW_TOKEN%
+start "" "http://localhost:%GW_PORT%/?token=%GW_TOKEN%"
 pause
