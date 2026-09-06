@@ -1,7 +1,7 @@
 {
   "gateway": {
     "mode": "local",
-    "port": __GATEWAY_PORT__
+    "port": 18789
   },
   "memory": {
     "search": {
@@ -12,7 +12,7 @@
     "providers": {
       "ollama": {
         "apiKey": "ollama-local",
-        "baseUrl": "http://127.0.0.1:__OLLAMA_PORT__",
+        "baseUrl": "http://127.0.0.1:11434",
         "api": "ollama",
         "timeoutSeconds": 900,
         "models": [
@@ -35,7 +35,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "__MODEL_PRIMARY__"
+        "primary": "ollama/qwen3:1.7b"
       }
     }
   }

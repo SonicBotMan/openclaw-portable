@@ -53,7 +53,7 @@ tar xf OpenClaw-Portable-v7.0.0-linux-core.tar
 tar xf OpenClaw-Portable-v7.0.0-linux-model.tar   # models/ 分片并入
 ./start.sh
 # 面板: http://localhost:18789/?token=<终端里显示>
-```
+```text
 
 `start.sh` 在任意目录/文件系统都能跑——**不再强制要求 U 盘挂载点**
 （[#40](../../issues/40)）。
@@ -77,7 +77,7 @@ tar xf OpenClaw-Portable-v7.0.0-linux-model.tar   # models/ 分片并入
 
 ## 文件清单
 
-```
+```text
 start.bat / start.sh      一键启动（检查、导入模型、起 gateway、开面板）
 stop.bat  / stop.sh       只停本便携包的 gateway + Ollama
 check.bat / check.sh      环境自检（node、openclaw、ollama、模型、端口）
@@ -87,7 +87,7 @@ config.html + apply-config.bat   云端 API key 配置面板
 scripts/                  set-portable-config.js / import-model.js / stop.js
 VERSIONS                  钉死的版本清单（CI 的单一事实源）
 data/                     运行时状态（配置、会话、模型库、日志），首次运行生成
-```
+```text
 
 ## 安全说明
 

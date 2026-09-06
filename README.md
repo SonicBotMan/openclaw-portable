@@ -62,7 +62,7 @@ tar xf OpenClaw-Portable-v7.0.0-linux-core.tar
 tar xf OpenClaw-Portable-v7.0.0-linux-model.tar   # parts land in models/
 ./start.sh
 # dashboard: http://localhost:18789/?token=<shown in terminal>
-```
+```text
 
 `start.sh` works from any folder or filesystem — no USB mount point required
 ([issue #40](../../issues/40)).
@@ -89,7 +89,7 @@ tar xf OpenClaw-Portable-v7.0.0-linux-model.tar   # parts land in models/
 
 ## Files
 
-```
+```text
 start.bat / start.sh      one-click start (checks, imports model, gateway, opens UI)
 stop.bat  / stop.sh       stop this portable's gateway + Ollama only
 check.bat / check.sh      environment check (node, openclaw, ollama, model, ports)
@@ -99,7 +99,7 @@ config.html + apply-config.bat   cloud API key setup panel
 scripts/                  set-portable-config.js, import-model.js, stop.js
 VERSIONS                  pinned versions (source of truth for CI)
 data/                     runtime state (config, sessions, model store, logs)
-```
+```text
 
 ## Security notes
 

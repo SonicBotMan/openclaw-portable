@@ -2,23 +2,24 @@
 /**
  * OpenClaw Portable v7 — config materializer.
  *
- * Reads the committed template (config/openclaw.json) and writes the live
- * config to <stateDir>/openclaw.json, substituting the placeholders:
- *   __GATEWAY_PORT__   gateway port
- *   __OLLAMA_PORT__    ollama port
- *   __MODEL_PRIMARY__  agents.defaults.model.primary (e.g. "ollama/qwen3:1.7b"
- *                      or a cloud model id such as "openai/gpt-5.6-sol")
+ * The committed template (config/openclaw.json) is VALID JSON with sane
+ * defaults. This script parses it and programmatically overrides the
+ * runtime-dependent values with correctly-typed ones (this is why the
+ * template stays valid JSON instead of using string placeholders):
+ *   gateway.port                        -> Number (openclaw's schema
+ *                                           rejects a string port)
+ *   models.providers.ollama.baseUrl     -> http://127.0.0.1:<ollamaPort>
+ *   agents.defaults.model.primary       -> modelPrimary
  *
  * The gateway token is intentionally NOT written to disk: the start scripts
  * pass it on the command line (`gateway run --token ...`) and only surface
- * it in the browser URL they open. Keeps tokens out of openclaw.json so
- * cleanup.bat/sh has less sensitive material and cloud-API keys (added later
- * via apply-config) can coexist without a token file.
+ * it in the browser URL they open. Keeps openclaw.json free of credentials
+ * (cloud API keys added later via apply-config are the only secrets).
  *
  * Usage:
  *   node set-portable-config.js <templatePath> <stateDir> <gatewayPort> <ollamaPort> <modelPrimary>
  *
- * Exit codes: 0 ok, 1 usage/IO error.
+ * Exit codes: 0 ok, 1 usage/IO/schema error.
  */
 
 
@@ -34,39 +35,42 @@ const [templatePath, stateDir, gatewayPort, ollamaPort, modelPrimary] = process.
 if (stateDir === undefined || gatewayPort === undefined || ollamaPort === undefined || modelPrimary === undefined) {
   die('usage: set-portable-config.js <templatePath> <stateDir> <gatewayPort> <ollamaPort> <modelPrimary>');
 }
-if (!/^\d+$/.test(gatewayPort) || !/^\d+$/.test(ollamaPort)) {
-  die('ports must be numeric (gateway=' + gatewayPort + ', ollama=' + ollamaPort + ')');
+const gw = Number(gatewayPort);
+const ol = Number(ollamaPort);
+if (!Number.isInteger(gw) || !Number.isInteger(ol) || gw < 1 || ol < 1) {
+  die(`ports must be integers (gateway=${gatewayPort}, ollama=${ollamaPort})`);
 }
 
-let raw;
+let template;
 try {
-  raw = fs.readFileSync(templatePath, 'utf8');
+  template = JSON.parse(fs.readFileSync(templatePath, 'utf8'));
 } catch (err) {
-  die('cannot read template ' + templatePath + ': ' + err.message);
+  die(`template ${templatePath} is not valid JSON: ${err.message}`);
 }
 
-const substituted = raw
-  .replace(/__GATEWAY_PORT__/g, gatewayPort)
-  .replace(/__OLLAMA_PORT__/g, ollamaPort)
-  .replace(/__MODEL_PRIMARY__/g, modelPrimary);
+template.gateway = template.gateway || {};
+template.gateway.mode = 'local';
+template.gateway.port = gw;
+template.memory = template.memory || {};
+template.memory.search = template.memory.search || {};
+template.memory.search.enabled = false; // offline: no OpenAI embeddings
+template.models = template.models || {};
+template.models.providers = template.models.providers || {};
+template.models.providers.ollama = template.models.providers.ollama || {};
+template.models.providers.ollama.apiKey = template.models.providers.ollama.apiKey || 'ollama-local';
+template.models.providers.ollama.baseUrl = `http://127.0.0.1:${ol}`;
+template.models.providers.ollama.api = 'ollama'; // native API, NOT the /v1 OpenAI-compatible path
+template.models.providers.ollama.timeoutSeconds = 900;
+template.agents = template.agents || {};
+template.agents.defaults = template.agents.defaults || {};
+template.agents.defaults.model = template.agents.defaults.model || {};
+template.agents.defaults.model.primary = modelPrimary;
 
-// Fail closed on any unrendered placeholder (e.g. template drifted).
-if (substituted.includes('__GATEWAY_PORT__') || substituted.includes('__OLLAMA_PORT__') || substituted.includes('__MODEL_PRIMARY__')) {
-  die('placeholder(s) left unrendered in generated config');
-}
-
-// Validate it is actually JSON before writing.
-try {
-  JSON.parse(substituted);
-} catch (err) {
-  die('generated config is not valid JSON: ' + err.message);
-}
-
+const outPath = path.join(stateDir, 'openclaw.json');
 try {
   fs.mkdirSync(stateDir, { recursive: true });
-  const outPath = path.join(stateDir, 'openclaw.json');
-  fs.writeFileSync(outPath, substituted + '\n', 'utf8');
-  console.log('[set-portable-config] wrote ' + outPath);
+  fs.writeFileSync(outPath, JSON.stringify(template, null, 2) + '\n', 'utf8');
 } catch (err) {
-  die('cannot write ' + stateDir + '/openclaw.json: ' + err.message);
+  die(`cannot write ${outPath}: ${err.message}`);
 }
+console.log(`[set-portable-config] wrote ${outPath}`);
