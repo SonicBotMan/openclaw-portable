@@ -103,13 +103,11 @@ rem Assemble split GGUF parts (part1..partN) into data\ (package may be read-onl
 set "GGUF=%DATA_DIR%\%MODEL_FILE%.Q4_K_M.gguf"
 if exist "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part1" (
   echo [INFO] Assembling model from split parts...
-  set /a PN=2
   copy /b "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part1" "%GGUF%" >nul 2>&1
-  :append_loop
-  if exist "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part!PN!" (
-    copy /b "%GGUF%" + "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part!PN!" "%GGUF%" >nul 2>&1
-    set /a PN+=1
-    goto append_loop
+  for /l %%p in (2,1,32) do (
+    if exist "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part%%p" (
+      copy /b "%GGUF%" + "%SCRIPT_DIR%\models\%MODEL_FILE%.Q4_K_M.gguf.part%%p" "%GGUF%" >nul 2>&1
+    )
   )
 )
 if not exist "%GGUF%" (
